@@ -41,7 +41,6 @@ def plot_band(model,
             pass
     ax.set_ylabel('Energy (eV)')
     ax.set_xlim(x[0], x[-1])
-    print(x[0], x[-1], X)
     ax.set_xticks(X)
     ax.set_xticklabels(knames)
     if erange is not None:

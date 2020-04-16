@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import pickle
 import os
 from banddownfolder.plot import plot_band
+from banddownfolder.electron.sislwrapper import SislWrapper
 import numpy as np
 
 
@@ -22,19 +23,18 @@ def read_model():
     return m
 
 
-def downfolding(
-    model,
-    kmesh,
-    nwann,
-    has_phase=False,
-    weight_func='unity',
-    mu=0,
-    sigma=0.01,
-    exclude_bands=[],
-    use_proj=False,
-    method='projected',
-    selected_basis=[],
-    anchors=None):
+def downfolding(model,
+                kmesh,
+                nwann,
+                has_phase=False,
+                weight_func='unity',
+                mu=0,
+                sigma=0.01,
+                exclude_bands=[],
+                use_proj=False,
+                method='projected',
+                selected_basis=[],
+                anchors=None):
     k = kmesh[0]
     kpts = monkhorst_pack(kmesh)
     pfname = f"eigens{k}.pickle"
@@ -95,19 +95,18 @@ class BandDownfolder():
         """
         self.model = model
 
-    def downfold(
-        self,
-        method='scdmk',
-        kmesh=(5, 5, 5),
-        nwann=0,
-        weight_func='unity',
-        mu=0.0,
-        sigma=2.0,
-        selected_basis=None,
-        anchors={(0, 0, 0): ()},
-        use_proj=True,
-        write_hr_nc='Downfolded_hr.nc',
-        write_hr_txt='Downfolded_hr.txt'):
+    def downfold(self,
+                 method='scdmk',
+                 kmesh=(5, 5, 5),
+                 nwann=0,
+                 weight_func='unity',
+                 mu=0.0,
+                 sigma=2.0,
+                 selected_basis=None,
+                 anchors={(0, 0, 0): ()},
+                 use_proj=True,
+                 write_hr_nc='Downfolded_hr.nc',
+                 write_hr_txt='Downfolded_hr.txt'):
         """
         Downfold the Band structure.
         The method first get the eigenvalues and eigenvectors in a Monkhorst-Pack grid from the model.
@@ -182,15 +181,27 @@ class BandDownfolder():
         show: whether to show the band structure.
         """
         ax = plot_band(self.model,
+                       kvectors=kvectors,
+                       knames=knames,
+                       supercell_matrix=supercell_matrix,
+                       npoints=npoints,
                        color=fullband_color,
                        alpha=0.8,
                        marker='',
+                       erange=erange,
+                       efermi=efermi,
                        ax=ax)
-        plot_band(self.ewf,
-                  color=downfolded_band_color,
-                  alpha=0.5,
-                  marker=marker,
-                  ax=ax)
+        ax = plot_band(self.ewf,
+                       kvectors=kvectors,
+                       knames=knames,
+                       supercell_matrix=supercell_matrix,
+                       npoints=npoints,
+                       efermi=efermi,
+                       color=downfolded_band_color,
+                       alpha=0.5,
+                       marker=marker,
+                       erange=erange,
+                       ax=ax)
         if savefig is not None:
             plt.savefig(savefig)
         if show:
@@ -203,9 +214,23 @@ class W90Downfolder(BandDownfolder):
         folder   # The folder containing the Wannier function files
         prefix,   # The prefix of Wannier90 outputs. e.g. wannier90_up
         """
-        m = Model.from_wannier_folder(folder=folder, prefix=prefix)
-        self.model= ijR.from_tbmodel(m)
 
-if __name__ == "__main__":
-    save_model()
-    main()
+        m = Model.from_wannier_folder(folder=folder, prefix=prefix)
+        self.model = ijR.from_tbmodel(m)
+
+
+class SislDownfolder(BandDownfolder):
+    def __init__(self, folder, fdf_file, spin=None):
+        """
+        Parameters:
+        ========================================
+        folder: folder of siesta calculation
+        fdf_file: siesta input filename
+        """
+        try:
+            import sisl
+        except ImportError:
+            raise ImportError("sisl is needed. Do you have sisl installed?")
+        fdf = sisl.get_sile(os.path.join(folder, fdf_file))
+        H = fdf.read_hamiltonian()
+        self.model = SislWrapper(H)

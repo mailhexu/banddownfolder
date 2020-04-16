@@ -1,11 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
 from scipy.linalg import eigh
 from banddownfolder.plot import plot_band
-from banddownfolder.scdm.downfolder import downfolding
+from banddownfolder.scdm.downfolder import BandDownfolder
 from banddownfolder.math.linalg import Lowdin
-import sisl
+_has_sisl = False
+try:
+    import sisl
+    _has_sisl=True
+except ImportError:
+    _has_sisl = False
 
 
 class SislWrapper():

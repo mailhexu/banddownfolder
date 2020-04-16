@@ -48,17 +48,17 @@ class LWF():
                                     dimensions=('nR', 'ndim'))
         ifc_real = root.createVariable(prefix + 'ifc_real',
                                        float,
-                                       dimensions=('nR',prefix+ 'nwann', prefix+'nwann'))
+                                       dimensions=('nR',prefix+ 'nwann', prefix+'nwann'), zlib=True)
         ifc_imag = root.createVariable(prefix + 'ifc_imag',
                                        float,
-                                       dimensions=('nR', prefix+'nwann', prefix+'nwann'))
+                                       dimensions=('nR', prefix+'nwann', prefix+'nwann'),zlib=True)
 
         wannR_real = root.createVariable(prefix + 'wannier_function_real',
                                          float,
-                                         dimensions=('nR', prefix+'nbasis', prefix+'nwann'))
+                                         dimensions=('nR', prefix+'nbasis', prefix+'nwann'),zlib=True)
         wannR_imag = root.createVariable(prefix + 'wannier_function_imag',
                                          float,
-                                         dimensions=('nR', prefix+'nbasis', prefix+'nwann'))
+                                         dimensions=('nR', prefix+'nbasis', prefix+'nwann'),zlib=True)
 
         #root.createVariable(prefix+'xred', float64, dimensions=(nR, nwann, nwann))
         #root.createVariable(prefix+'cell', float64, dimensions=(nR, nwann, nwann))
