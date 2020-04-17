@@ -34,18 +34,11 @@ def downfolding(model,
                 use_proj=False,
                 method='projected',
                 selected_basis=[],
+                anchor_kpt=(0,0,0),
                 anchors=None):
     k = kmesh[0]
     kpts = monkhorst_pack(kmesh)
-    pfname = f"eigens{k}.pickle"
-    if True:  #not os.path.exists(pfname):
-        evals, evecs = model.solve_all(kpts)
-        with open(pfname, 'wb') as myfile:
-            pickle.dump((evals, evecs), myfile)
-    else:
-        with open(pfname, 'rb') as myfile:
-            evals, evecs = pickle.load(myfile)
-
+    evals, evecs = model.solve_all(kpts)
     try:
         positions = model.positions
     except Exception:
@@ -66,6 +59,9 @@ def downfolding(model,
             wann_builder.set_selected_cols(selected_basis)
         elif anchors:
             wann_builder.set_anchors(anchors)
+        else:
+            wann_builder.auto_set_anchors(anchor_kpt)
+
         wf = wann_builder.get_wannier()
     elif method == "projected":
         wann_builder = WannierProjectedBuilder(
@@ -84,7 +80,6 @@ def downfolding(model,
         elif anchors:
             wann_builder.set_projectors_with_anchors(anchors)
         wf = wann_builder.get_wannier()
-
     return wf
 
 
@@ -103,7 +98,8 @@ class BandDownfolder():
                  mu=0.0,
                  sigma=2.0,
                  selected_basis=None,
-                 anchors={(0, 0, 0): ()},
+                 anchors=None,
+                 anchor_kpt=(0,0,0),
                  use_proj=True,
                  write_hr_nc='Downfolded_hr.nc',
                  write_hr_txt='Downfolded_hr.txt'):
@@ -119,7 +115,7 @@ class BandDownfolder():
         method:  the method of downfolding. scdmk|projected
         kmesh,   The k-mesh used for the BZ sampling. e.g. (5, 5, 5)
                  Note that for the moment, only odd number should be used so that the mesh is Gamma centered.
-        nwann,   Number of Wannier functions to be constructed. 
+        nwann,   Number of Wannier functions to be constructed.
         weight_func='Gauss',   # The weight function type. 'unity', 'Gauss', 'Fermi', or 'window'
          - unity: all the bands are equally weighted.
          - Gauss: A gaussian centered at mu, and has the half width of sigma.
@@ -129,6 +125,7 @@ class BandDownfolder():
         sigma=2.0 : see above
         selected_basis, A list of the indexes of the Wannier functions as initial guess. The number should be equal to nwann.
         anchors: Anchor points. The index of band at one k-point. e.g.(0, 0, 0): (6, 7, 8)
+        anchor_kpt: the kpoint used for automatically selecting of anchor points.
         use_proj: Whether to use projection to the anchor points in the weight function.
         write_hr_nc: write the Hamiltonian into a netcdf file. It require the NETCDF4 python library. use write_nc=None if not needed.
         write_hr_txt: write the Hamiltonian into a txt file.
@@ -142,6 +139,7 @@ class BandDownfolder():
                                sigma=sigma,
                                selected_basis=selected_basis,
                                anchors=anchors,
+                               anchor_kpt=anchor_kpt,
                                use_proj=use_proj)
         if write_hr_txt is not None:
             self.ewf.save_txt(write_hr_txt)
@@ -163,6 +161,7 @@ class BandDownfolder():
                           marker='o',
                           ax=None,
                           savefig='Downfolded_band.png',
+                          cell=np.eye(3),
                           show=True):
         """
         Parameters:
@@ -190,6 +189,7 @@ class BandDownfolder():
                        marker='',
                        erange=erange,
                        efermi=efermi,
+                       cell=cell,
                        ax=ax)
         ax = plot_band(self.ewf,
                        kvectors=kvectors,
@@ -201,6 +201,7 @@ class BandDownfolder():
                        alpha=0.5,
                        marker=marker,
                        erange=erange,
+                       cell=cell,
                        ax=ax)
         if savefig is not None:
             plt.savefig(savefig)
@@ -233,4 +234,4 @@ class SislDownfolder(BandDownfolder):
             raise ImportError("sisl is needed. Do you have sisl installed?")
         fdf = sisl.get_sile(os.path.join(folder, fdf_file))
         H = fdf.read_hamiltonian()
-        self.model = SislWrapper(H)
+        self.model = SislWrapper(H, spin=spin)

@@ -20,7 +20,7 @@ class SislWrapper():
         if self.spin is None:
             return self.ham.eigh(k=k, eigvals_only=False)
         else:
-            return self.ham.eigh(k=k, spin=spin, eigvals_only=False)
+            return self.ham.eigh(k=k, spin=self.spin, eigvals_only=False)
 
     def Hk(self, k, format='dense'):
         if self.spin is not None:

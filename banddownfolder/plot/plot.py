@@ -14,6 +14,7 @@ def plot_band(model,
               color='blue',
               alpha=0.8,
               marker='',
+              cell=np.eye(3),
               ax=None):
     if ax is None:
         _fig, ax = plt.subplots()
@@ -21,11 +22,10 @@ def plot_band(model,
     if supercell_matrix is None:
         supercell_matrix = np.eye(3)
     kvectors = [np.dot(k, supercell_matrix) for k in kvectors]
-
     if 'cell' not in model.__dict__:
-        band = bandpath(kvectors, np.eye(3)@supercell_matrix, npoints)
+        band = bandpath(kvectors, cell@supercell_matrix, npoints)
     else:
-        band = bandpath(kvectors, np.eye(3)@supercell_matrix, npoints)
+        band = bandpath(kvectors, cell@supercell_matrix, npoints)
     kpts = band.kpts
     x, X, _labels = band.get_linear_kpoint_axis()
     evalues, _evecs = model.solve_all(kpts=kpts)

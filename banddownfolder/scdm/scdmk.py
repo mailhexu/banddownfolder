@@ -153,6 +153,7 @@ class WannierBuilder():
         Find the most close k point to kpt from the kpts list.
         TODO: use PBC.
         """
+        print(kpt)
         kpt = np.array(kpt)
         ns = np.linalg.norm(self.kpts - kpt[None, :], axis=1)
         ik = np.argmin(ns)
@@ -330,11 +331,6 @@ class WannierScdmkBuilder(WannierBuilder):
 
         psi_Dagger = psi_D.T.conj()  #psi.T.conj()
 
-        #for i in range(psi_Dagger.shape[0]):
-        #    if i not in ianchors:
-        #        psi_Dagger[i, :] = 0.0
-        #    else:
-        #        psi_Dagger[i, :] *= 1.0
         cols = scdm(psi_Dagger, len(ianchors))
         self.cols = np.array(tuple(set(self.cols).union(cols)))
 
@@ -350,6 +346,17 @@ class WannierScdmkBuilder(WannierBuilder):
         assert len(
             self.cols
         ) == self.nwann, "After adding all anchors, the number of selected columns != nwann"
+
+    def auto_set_anchors(self, kpt=(0.0,0.0,0.0)):
+        """
+        Automatically find the columns using an anchor kpoint.
+        kpt: the kpoint used to set as anchor points. default is Gamma (0,0,0)
+        """
+        ik=self.find_k(kpt)
+        psi = self.get_psi_k(ik)[:, :] * self.occ[ik][None, :]
+        psi_Dagger=psi.T.conj()
+        self.cols = scdm(psi_Dagger, self.nwann)
+        print(f"anchor_kpt={kpt}. Selected columns: {self.cols}.")
 
     def _get_projection_to_anchors(self):
         # anchor point wavefunctions with phase removed
