@@ -101,6 +101,7 @@ class BandDownfolder():
                  anchors=None,
                  anchor_kpt=(0,0,0),
                  use_proj=True,
+                 exclude_bands=[],
                  write_hr_nc='Downfolded_hr.nc',
                  write_hr_txt='Downfolded_hr.txt'):
         """
@@ -140,7 +141,9 @@ class BandDownfolder():
                                selected_basis=selected_basis,
                                anchors=anchors,
                                anchor_kpt=anchor_kpt,
-                               use_proj=use_proj)
+                               use_proj=use_proj,
+                               exclude_bands=exclude_bands,
+                               )
         if write_hr_txt is not None:
             self.ewf.save_txt(write_hr_txt)
         if write_hr_nc is not None:

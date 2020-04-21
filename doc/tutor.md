@@ -27,6 +27,7 @@ pip uninstall minimulti
 
 ### Usage:
 
+#### Downfolding from Wannier90 Hamiltonian
 Below is an example of how to use downfold an tight-binding Hamiltonian from Wannier90 output. 
 
 We need to write a python script (e.g. downfold.py) to call the Downfolder. I'll explain the code line by line.
@@ -53,7 +54,9 @@ def main():
                    sigma=3.0,
                    selected_basis=None,
                    anchors={(0, 0, 0): (12, 13)},
+                   anchor_kpt = None,
                    use_proj=True,
+                   exclude_bands=[],
                    write_hr_nc='Downfolded_hr.nc',
                    write_hr_txt='Downfolded_hr.txt')
 
@@ -102,11 +105,35 @@ After running the script, we get the output of Wannier functions (in Downfolded_
   - The method is first performed for each k-point in a BZ, and the
   - There are two methods implemented: the scdm-k method and the projected Wannier function method. Both use the same set of parameters.  The parameters are below. 
 
-  - There are two methods to specify the Wannier functions we need to build. First is that we can give some anchor points, e.g. the band with index 12 and 13 at $\Gamma$, given as {(0,0,0):(12,13)}. 
+  - There are three methods to specify the bands we need to build the wannier functions from. First is that we can give some anchor points, e.g. the band with index 12 and 13 at $\Gamma$, given as
+ ```
+  nwann=2,
+  anchors={(0,0,0):(12,13)},
+  selected_basis = None,
+  anchor_kpt = None,
+ ```
 
-    The second method is we could select the basis from the original Wannier functions. E.g. in this example we could select the two $e_g$ orbitals of Mn.  Only one of the two method should be used. The  parameter for the non-used one should be set to None.
+The second method is we could select the basis from the original Wannier functions. E.g. in this example we could select the two $e_g$ orbitals of Mn (indices 0 and 3).  Only one of the two method should be used. e.g.
+
+```
+  nwann=2,
+  anchors=None
+  selected_basis = [0,3],
+  anchor_kpt = None,
+```
+
+   The third method is that we only give an anchor kpoint. It will then try to find the best fitting in the given energy weight function in the anchor-kpoint. e.g.
+
+```
+nwann=2,
+anchor_kpt=(0,0,0),
+anchors=None,
+selected_basis=None
+```
+Note that the three methods cannot be used in the simutaneously. Therefore, the parameters for the ones not in used should be set by None (which are the defaults).
 
   - In addition to the anchor points or the selected_basis, a energy weight function can be specified to indicate where the band we need are located, given by the parameters weight_func, mu, and sigma. 
+
 
   ​	==Note==: All the indices are zero-based. 
 
@@ -136,7 +163,9 @@ After running the script, we get the output of Wannier functions (in Downfolded_
         sigma: see above
         selected_basis, A list of the indexes of the Wannier functions as initial guess. The number should be equal to nwann.
         anchors: Anchor points. The index of band at one k-point. e.g.(0, 0, 0): (6, 7, 8)
+        anchor_kpt: used for auto selecting of anchors. Only the kpoint. e.g. (0,0,0)
         use_proj: Whether to use projection to the anchor points in the weight function.
+        exclude_bands: the list of bands not considered in the disentanglement.
         write_hr_nc: write the Hamiltonian into a netcdf file. It require the NETCDF4 python library. use write_nc=None if not needed.
         write_hr_txt: write the Hamiltonian into a txt file.
 
@@ -205,7 +234,34 @@ R = [-1 -1 -1], i = 1, j=1 :: H(i,j,R)= 0.0036+0.0000j
 ....
 ```
 
+#### Downfolding from Siesta LCAO Hamiltonian.
+We take SrMnO$_3$ cubic structure as an example (The files can be found in example/Siesta/SrMnO3_SOC directory.) 
+Durint the siesta SCF calculation, we need the following parameters to save the Hamiltonian and the overlap matrices. 
+```
+SaveHS  True
+CDF.Save True
+SaveHS True
+```
+After running siesta, we can proceed.
 
+==NOTE== We use [sisl](http://zerothi.github.io/sisl/docs/latest/index.html) to load the siesta outputs. It need to be installed before you follow the example.
+```
+pip install sisl
+```
 
+We write a python script similar to the example above. The difference is that we read the siesta output instead of Wannier, by specifying the path and the name of the fdf file. A extra parameter spin can be specified. For non-polarized and spin-orbit calculation, it should be set to None. For collinear spin calculation, spin=0 or 1 gives the up and down channel of the band structure. 
 
+```
+downfolder = SislDownfolder(folder='.', fdf_file='siesta.fdf', spin=None)
+```
+
+In this example, spin-orbit coupling is activated in the siesta calculation. We build the Mn 4 $e_g$ band with spinor wavefunctions.  We can select four anchor points. 
+
+```
+        anchors={(.0, .0, 0): [46, 47, 48, 49]},
+```
+
+We get the following band downfolding result. 
+
+![Downfolded_band](tutor.assets/Downfolded_band-1587474503775.png)
 

@@ -14,6 +14,7 @@ def main():
         use_proj=False,
         selected_basis=None,
         anchors={(.0, .0, 0): [46, 47, 48, 49]},
+        exclude_bands=[],
         write_hr_nc="Downfolded_hr.nc",
         write_hr_txt="Downfolded_hr.txt",
     )

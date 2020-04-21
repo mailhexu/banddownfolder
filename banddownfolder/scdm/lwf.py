@@ -20,7 +20,7 @@ class LWF():
         for iR, R in enumerate(self.Rlist):
             phase = np.exp(2j * np.pi * np.dot(R, k))
             hk += self.HwannR[iR, :, :] * phase
-        #hk = (hk + hk.T.conj()) / 2
+        hk = (hk + hk.T.conj()) / 2
         return hk
 
     def solve_wann_k(self, k):

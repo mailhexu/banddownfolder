@@ -183,7 +183,7 @@ class WannierBuilder():
             self.wannk[ik] = self.get_psi_k(ik) @ self.Amn[ik, :, :]
             h = self.Amn[ik, :, :].T.conj() @ np.diag(
                 self.get_eval_k(ik)) @ self.Amn[ik, :, :]
-            #h = (h + h.T.conj()) / 2
+            h = (h + h.T.conj()) / 2
             self.Hwann_k[ik] = h
         return self.wannk, self.Hwann_k
 
@@ -356,6 +356,7 @@ class WannierScdmkBuilder(WannierBuilder):
         psi = self.get_psi_k(ik)[:, :] * self.occ[ik][None, :]
         psi_Dagger=psi.T.conj()
         self.cols = scdm(psi_Dagger, self.nwann)
+        print(f"The eigenvalues at anchor k: {self.get_eval_k(ik)}")
         print(f"anchor_kpt={kpt}. Selected columns: {self.cols}.")
 
     def _get_projection_to_anchors(self):
