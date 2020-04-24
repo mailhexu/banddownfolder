@@ -153,7 +153,6 @@ class WannierBuilder():
         Find the most close k point to kpt from the kpts list.
         TODO: use PBC.
         """
-        print(kpt)
         kpt = np.array(kpt)
         ns = np.linalg.norm(self.kpts - kpt[None, :], axis=1)
         ik = np.argmin(ns)
@@ -333,6 +332,7 @@ class WannierScdmkBuilder(WannierBuilder):
 
         cols = scdm(psi_Dagger, len(ianchors))
         self.cols = np.array(tuple(set(self.cols).union(cols)))
+        print(f"Using the anchor points, these cols are selected: {self.cols}")
 
     def set_anchors(self, anchors):
         """
