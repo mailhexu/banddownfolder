@@ -8,7 +8,9 @@ import pickle
 import os
 from banddownfolder.plot import plot_band
 from banddownfolder.electron.sislwrapper import SislWrapper
+from banddownfolder.electron.phononwrapper import PhonopyWrapper
 import numpy as np
+import json
 
 
 def save_Wannier_model():
@@ -23,7 +25,7 @@ def read_model():
     return m
 
 
-def downfolding(model,
+def make_builder(model,
                 kmesh,
                 nwann,
                 has_phase=False,
@@ -61,8 +63,6 @@ def downfolding(model,
             wann_builder.set_anchors(anchors)
         else:
             wann_builder.auto_set_anchors(anchor_kpt)
-
-        wf = wann_builder.get_wannier()
     elif method == "projected":
         wann_builder = WannierProjectedBuilder(
             evals=evals,
@@ -79,8 +79,8 @@ def downfolding(model,
             wann_builder.set_projectors_with_basis(selected_basis)
         elif anchors:
             wann_builder.set_projectors_with_anchors(anchors)
-        wf = wann_builder.get_wannier()
-    return wf
+    return wann_builder
+
 
 
 class BandDownfolder():
@@ -131,7 +131,7 @@ class BandDownfolder():
         write_hr_nc: write the Hamiltonian into a netcdf file. It require the NETCDF4 python library. use write_nc=None if not needed.
         write_hr_txt: write the Hamiltonian into a txt file.
         """
-        self.ewf = downfolding(self.model,
+        self.builder=make_builder(self.model,
                                method=method,
                                kmesh=kmesh,
                                nwann=nwann,
@@ -144,11 +144,16 @@ class BandDownfolder():
                                use_proj=use_proj,
                                exclude_bands=exclude_bands,
                                )
+        self.ewf =self.builder.get_wannier()
+        self._post_downfold()
         if write_hr_txt is not None:
             self.ewf.save_txt(write_hr_txt)
         if write_hr_nc is not None:
             self.ewf.write_nc(write_hr_nc)
-            return self.ewf
+        return self.ewf
+
+    def _post_downfold(self):
+        pass
 
     def plot_band_fitting(self,
                           kvectors=np.array([[0, 0, 0], [0.5, 0, 0],
@@ -224,7 +229,7 @@ class W90Downfolder(BandDownfolder):
 
 
 class SislDownfolder(BandDownfolder):
-    def __init__(self, folder, fdf_file, spin=None):
+    def __init__(self, folder=None, fdf_file=None, H=None, spin=None, recover_fermi=False):
         """
         Parameters:
         ========================================
@@ -235,6 +240,44 @@ class SislDownfolder(BandDownfolder):
             import sisl
         except ImportError:
             raise ImportError("sisl is needed. Do you have sisl installed?")
-        fdf = sisl.get_sile(os.path.join(folder, fdf_file))
-        H = fdf.read_hamiltonian()
-        self.model = SislWrapper(H, spin=spin)
+        shift_fermi=None
+        if H is None:
+            fdf = sisl.get_sile(os.path.join(folder, fdf_file))
+            fdf.read()
+            H = fdf.read_hamiltonian()
+            self.efermi=fdf.read_fermi_level().data[0]
+            if recover_fermi:
+                self.shift_fermi=self.efermi
+        self.model = SislWrapper(H, spin=spin, shift_fermi=shift_fermi)
+
+
+
+    def _post_downfold(self, fname='Downfold.json'):
+        cols=self.builder.cols
+        #print(f"All orbs:{self.model.orbs}")
+        self.orbs=[self.model.orbs[i] for i in cols]
+        #print(f"Selected cols: {cols}")
+        #print(f"Selected orbs: {self.orbs}")
+        #b=self.ewf.get_wann_largest_basis()
+        #print(f"largest: {b}, {self.model.orbs[b]}")
+        with open(fname, 'w') as myfile:
+            json.dump({'selected_columns': cols.tolist(),
+                       'Orb_names' : tuple(self.orbs),
+                       'Efermi': self.efermi,
+            },myfile, sort_keys=True, indent=4)
+
+class PhonopyDownfolder(BandDownfolder):
+    def __init__(self,  phonon=None, *argv, **kwargs):
+        """
+        Parameters:
+        ========================================
+        folder: folder of siesta calculation
+        fdf_file: siesta input filename
+        """
+        try:
+            import phonopy
+        except ImportError:
+            raise ImportError("phonopy is needed. Do you have phonopy installed?")
+        if phonon is None:
+            phonon=phonopy.load(*argv, **kwargs)
+        self.model = PhonopyWrapper(phonon)

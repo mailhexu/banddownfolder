@@ -40,22 +40,28 @@ class WannierBuilder():
     General Wannier function builder
     """
     def __init__(
-        self,
-        evals,
-        wfn,
-        positions,
-        kpts,
-        nwann,
-        weight_func,
-        has_phase=True,
-        Rgrid=None,
-        exclude_bands=None,
+            self,
+            evals,
+            wfn,
+            positions,
+            kpts,
+            nwann,
+            weight_func,
+            Sk=None,
+            has_phase=True,
+            Rgrid=None,
+            exclude_bands=None,
     ):
         #eigen
         self.evals = np.array(evals, dtype=float)
         self.kpts = np.array(kpts, dtype=float)
         self.ndim = self.kpts.shape[1]
         self.nkpt, self.nbasis, self.nband = np.shape(wfn)
+        if Sk is None:
+            self.is_orthogonal=True
+        else:
+            self.S=Sk
+            self.is_orthogonal=False
         # exclude bands
         if exclude_bands is None:
             exclude_bands = []
@@ -186,6 +192,20 @@ class WannierBuilder():
             self.Hwann_k[ik] = h
         return self.wannk, self.Hwann_k
 
+    def get_wannier_centers(self):
+        self.wann_centers=np.zeros((self.nwann, 3), dtype=float)
+        for iR, R in enumerate(self.Rlist):
+            for iwann in range(self.nwann):
+                c=self.wannR[iR,:, :]
+                self.wann_centers+=(c.conj()*c).T.real@self.positions  + R[None, :]
+        print(f"Wannier Centers: {self.wann_centers}")
+
+    def _assure_normalized(self):
+        # FIXME: Use overlap matrix.
+        for iwann in range(self.nwann):
+            norm=np.trace(self.HwannR[:,:, iwann].conj().T@self.HwannR[:, :, iwann])
+            print(f"Norm {iwann}: {norm}")
+
     def k_to_R(self):
         """
         Calculate Wannier function and Hamiltonian from K space to R space.
@@ -197,7 +217,9 @@ class WannierBuilder():
                     ik, :, :] * phase * self.kweight[ik]
                 self.wannR[iR] += self.wannk[
                     ik, :, :] * phase * self.kweight[ik]
-        return LWF(self.wannR, self.HwannR, self.Rlist)
+        self._assure_normalized()
+        self.get_wannier_centers()
+        return LWF(self.wannR, self.HwannR, self.Rlist, cell=np.eye(3), wann_centers=self.wann_centers)
 
     def save_Amnk_nc(self, fname):
         """
@@ -282,9 +304,11 @@ class WannierScdmkBuilder(WannierBuilder):
                  kpts,
                  nwann,
                  weight_func,
+                 Sk=None,
                  has_phase=True,
                  Rgrid=None,
                  exclude_bands=[],
+                 sort_cols=True,
                  use_proj=True):
 
         super().__init__(evals=evals,
@@ -292,6 +316,7 @@ class WannierScdmkBuilder(WannierBuilder):
                          positions=positions,
                          kpts=kpts,
                          nwann=nwann,
+                         Sk=Sk,
                          weight_func=weight_func,
                          has_phase=has_phase,
                          Rgrid=Rgrid,
@@ -301,6 +326,7 @@ class WannierScdmkBuilder(WannierBuilder):
         self.cols = []
         self.use_proj = use_proj
         self.projs = np.zeros((self.nkpt, self.nband), dtype=float)
+        self.sort_cols=sort_cols
 
     def set_selected_cols(self, cols):
         """
@@ -311,6 +337,9 @@ class WannierScdmkBuilder(WannierBuilder):
                 cols
             ) == self.nwann, "Number of columns should be equal to number of Wannier functions"
             self.cols = cols
+            if self.sort_cols:
+                self.cols=np.sort(self.cols)
+
 
     def add_anchors(self, psi, ianchors):
         """
@@ -332,6 +361,8 @@ class WannierScdmkBuilder(WannierBuilder):
 
         cols = scdm(psi_Dagger, len(ianchors))
         self.cols = np.array(tuple(set(self.cols).union(cols)))
+        if self.sort_cols:
+            self.cols=np.sort(self.cols)
         print(f"Using the anchor points, these cols are selected: {self.cols}")
 
     def set_anchors(self, anchors):
@@ -356,6 +387,8 @@ class WannierScdmkBuilder(WannierBuilder):
         psi = self.get_psi_k(ik)[:, :] * self.occ[ik][None, :]
         psi_Dagger=psi.T.conj()
         self.cols = scdm(psi_Dagger, self.nwann)
+        if self.sort_cols:
+            self.cols=np.sort(self.cols)
         print(f"The eigenvalues at anchor k: {self.get_eval_k(ik)}")
         print(f"anchor_kpt={kpt}. Selected columns: {self.cols}.")
 
@@ -432,7 +465,6 @@ def Amnk_to_Hk(Amn, psi, Hk0, kpts):
     for ik, k in enumerate(kpts):
         wfn = psi[ik, :, :] @ Amn[ik, :, :]
         hk = wfn.T.conj() @ Hk0[ik, :, :] @ wfn
-        #hk = wfn.T @ Hk0[ik, :, :] @ wfn
         Hk_prim.append(hk)
     return np.array(Hk_prim)
 

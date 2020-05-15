@@ -1,11 +1,28 @@
 import numpy as np
 from scipy.linalg import eigh
 from banddownfolder.math.linalg import Lowdin
+from ase.atoms import Atoms
+from banddownfolder.utils.symbol import symbol_number
+from collections import defaultdict
 
 
 class SislWrapper():
-    def __init__(self, sisl_hamiltonian, spin=None):
+    def __init__(self, sisl_hamiltonian, shift_fermi=None, spin=None):
         self.ham = sisl_hamiltonian
+        self.shift_fermi=shift_fermi
+        self.spin=spin
+        self.orbs=[]
+        self.orb_dict=defaultdict(lambda:[])
+        g=self.ham._geometry
+        _atoms=self.ham._geometry._atoms
+        atomic_numbers=[]
+        atom_positions=g.xyz
+        self.cell=np.array(g.sc.cell)
+        for ia, a in enumerate(_atoms):
+            atomic_numbers.append(a.Z)
+        self.atoms=Atoms(numbers=atomic_numbers, cell=self.cell, positions=atom_positions)
+        xred=self.atoms.get_scaled_positions()
+        sdict=list(symbol_number(self.atoms).keys())
         if self.ham.spin.is_colinear:
             if spin is None:
                 raise ValueError("For colinear spin, spin must be given")
@@ -14,13 +31,49 @@ class SislWrapper():
                 raise ValueError(
                     "For non-colinear spin and unpolarized spin, spin should be None"
                 )
-        self.spin = spin
+
+        self.positions=[]
+        if self.ham.spin.is_colinear:
+            for ia, a in enumerate(_atoms):
+                symnum=sdict[ia]
+                orb_names=[]
+                for x in a.orbital:
+                    name=f"{symnum}|{x.name()}|{spin}"
+                    orb_names.append(name)
+                    self.positions.append(xred[ia])
+                self.orbs+=orb_names
+                self.orb_dict[ia]+=orb_names
+            self.norb = len(self.orbs)
+            self.nbasis=self.norb
+        elif self.ham.spin.is_spinorbit:
+            for spin in ['up', 'down']:
+                for ia, a in enumerate(_atoms):
+                    symnum=sdict[ia]
+                    orb_names=[]
+                    for x in a.orbital:
+                        name=f"{symnum}|{x.name()}|{spin}"
+                        orb_names.append(name)
+                        self.positions.append(xred[ia])
+                    self.orbs+=orb_names
+                    self.orb_dict[ia]+=orb_names
+            self.norb=len(self.orbs)/2
+            self.nbasis= len(self.orbs)
+        else:
+            raise ValueError("The hamiltonian should be either spin-orbit or colinear")
+        self.positions=np.array(self.positions, dtype=float)
+
+
+    def print_orbs(self):
+        print(self.orb_dict)
 
     def solve(self, k):
         if self.spin is None:
-            return self.ham.eigh(k=k, eigvals_only=False)
+            evals, evecs= self.ham.eigh(k=k, eigvals_only=False)
         else:
-            return self.ham.eigh(k=k, spin=self.spin, eigvals_only=False)
+            evals, evecs= self.ham.eigh(k=k, spin=self.spin, eigvals_only=False)
+        if self.shift_fermi:
+            evals += self.shift_fermi
+        return evals, evecs
 
     def Hk(self, k, format='dense'):
         if self.spin is not None:
@@ -47,4 +100,7 @@ class SislWrapper():
                                                       order='C')
 
     def get_fermi_level(self):
-        return 0.0
+        if self.shift_fermi:
+            return self.shift_fermi
+        else:
+            return 0.0
