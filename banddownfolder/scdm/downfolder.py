@@ -260,10 +260,15 @@ class SislDownfolder(BandDownfolder):
         #print(f"Selected orbs: {self.orbs}")
         #b=self.ewf.get_wann_largest_basis()
         #print(f"largest: {b}, {self.model.orbs[b]}")
+        atoms=self.model.atoms
         with open(fname, 'w') as myfile:
             json.dump({'selected_columns': cols.tolist(),
                        'Orb_names' : tuple(self.orbs),
                        'Efermi': self.efermi,
+                       'chemical_symbols': atoms.get_chemical_symbols(),
+                       'atom_xred': atoms.get_scaled_positions().tolist(),
+                       'cell': atoms.get_cell().tolist()
+                        
             },myfile, sort_keys=True, indent=4)
 
 class PhonopyDownfolder(BandDownfolder):

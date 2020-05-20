@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 from scipy.linalg import eigh
 from ase.dft.kpoints import monkhorst_pack
 from netCDF4 import Dataset
@@ -22,13 +23,14 @@ class LWF():
     @property
     def hoppings(self):
         Rlist=[tuple(R) for R in self.Rlist]
-        data = dict(zip(self.Rlist, self.HwannR))
+        data = copy.deepcopy(dict(zip(Rlist, self.HwannR)))
         np.fill_diagonal(data[(0, 0, 0)], 0.0)
         return data
 
     @property
     def site_energies(self):
-        return np.real(np.diag(self.HwannR[self.Rdict[(0,0,0)]]))
+        iR=self.Rdict[(0,0,0)]
+        return np.real(np.diag(self.HwannR[iR]))
 
 
     def HR(self, R):
@@ -125,7 +127,11 @@ class LWF():
         wannR_real = root.variables[prefix + 'wannier_function_real'][:]
         wannR_imag = root.variables[prefix + 'wannier_function_imag'][:]
         wannR = wannR_real + wannR_imag * 1.0j
-        return LWF(wannR, ifc, Rlist)
+        # FIXME: cell and wann_centers
+        return LWF(wannR, ifc, Rlist, cell=np.eye(3), wann_centers=np.zeros((nwann, ndim)))
+
+
+
 
     def get_num_orbitals(self):
         return self.nwann
@@ -176,7 +182,9 @@ class LWF_COHP(LWF):
         wannR_real = root.variables[prefix + 'wannier_function_real'][:]
         wannR_imag = root.variables[prefix + 'wannier_function_imag'][:]
         wannR = wannR_real + wannR_imag * 1.0j
-        return LWF_COHP(wannR, ifc, Rlist)
+
+        return LWF_COHP(wannR, ifc, Rlist, cell=np.eye(3), wann_centers=np.zeros((nwann, ndim)))
+        #return LWF_COHP(wannR, ifc, Rlist)
 
 
 strx = """0.         0.04728673 0.09457345 0.14186018 0.18914691 0.23643363
@@ -228,9 +236,13 @@ def test_load():
     band = bandpath(kvectors, cell, npoints=152)
     kpts = band.kpts
     x, X, _labels = band.get_linear_kpoint_axis()
+
+    lwf = LWF.load_nc(fname)
+    print(lwf.site_energies)
     lwf = LWF_COHP.load_nc(fname)
+    #print(lwf.site_energies)
     Eon = np.real(np.diag(lwf.HR((0, 0, 0))))
-    print(Eon)
+    #print(Eon)
     from minimulti.electron.COHP import COHP
     cohp = COHP(lwf)
     ax=cohp.plot_COHP_fatband(
@@ -252,3 +264,4 @@ def test_load():
     plt.show()
 
 
+#test_load()
