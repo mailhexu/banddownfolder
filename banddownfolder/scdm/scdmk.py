@@ -70,6 +70,7 @@ class WannierBuilder():
         self.nband = len(self.ibands)
         self.nwann = nwann
         self.positions = positions
+        print(self.positions.shape)
         # kpts
         self.nkpt = self.kpts.shape[0]
         self.kmesh, self.k_offset = get_monkhorst_pack_size_and_offset(
@@ -188,16 +189,16 @@ class WannierBuilder():
             self.wannk[ik] = self.get_psi_k(ik) @ self.Amn[ik, :, :]
             h = self.Amn[ik, :, :].T.conj() @ np.diag(
                 self.get_eval_k(ik)) @ self.Amn[ik, :, :]
-            h = (h + h.T.conj()) / 2
+            #h = (h + h.T.conj()) / 2
             self.Hwann_k[ik] = h
         return self.wannk, self.Hwann_k
 
     def get_wannier_centers(self):
         self.wann_centers=np.zeros((self.nwann, 3), dtype=float)
         for iR, R in enumerate(self.Rlist):
-            for iwann in range(self.nwann):
-                c=self.wannR[iR,:, :]
-                self.wann_centers+=(c.conj()*c).T.real@self.positions  + R[None, :]
+            c=self.wannR[iR,:, :]
+            self.wann_centers+=(c.conj()*c).T.real@self.positions  + R[None, :]
+            #self.wann_centers+=np.einsum('ij, ij, jk', c.conj())#(c.conj()*c).T.real@self.positions  + R[None, :]
         print(f"Wannier Centers: {self.wann_centers}")
 
     def _assure_normalized(self):
@@ -474,7 +475,7 @@ def Hk_to_Hreal(Hk, kpts, kweight, Rpts):
     nk = len(kpts)
     nR = len(Rpts)
     for iR, R in enumerate(Rpts):
-        HR = np.zeros((nR, nbasis, nbasis))
+        HR = np.zeros((nR, nbasis, nbasis), dtype=complex)
         for ik, k in enumerate(kpts):
             phase = np.exp(-2j * np.pi * np.dot(R, k))
             HR[iR] += Hk[ik] * phase * kweight[ik]
@@ -486,3 +487,6 @@ def test():
     import matplotlib.pyplot as plt
     plt.plot(a, 0.5 * erfc((a - 0.0) / 0.5))
     plt.show()
+
+
+#print(kmesh_to_R([2,2,2]))

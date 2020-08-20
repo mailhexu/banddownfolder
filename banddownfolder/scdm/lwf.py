@@ -1,19 +1,22 @@
 import numpy as np
 import copy
 from scipy.linalg import eigh
-from ase.dft.kpoints import monkhorst_pack
 from netCDF4 import Dataset
+from ase.dft.kpoints import monkhorst_pack
+from ase import Atoms
+
 
 class LWF():
     """
     Lattice Wannier function
     """
-    def __init__(self, wannR, HwannR, Rlist, cell, wann_centers):
+    def __init__(self, wannR, HwannR, Rlist, cell, wann_centers, atoms=None):
+        self.atoms = atoms
         self.wannR = wannR
         self.HwannR = HwannR
         self.Rlist = Rlist
-        self.cell=cell
-        self.wann_centers=wann_centers
+        self.cell = cell
+        self.wann_centers = wann_centers
         self.nR, self.nbasis, self.nwann = np.shape(wannR)
         self.ndim = np.shape(self.Rlist)[1]
         self.Rdict = {}
@@ -22,16 +25,15 @@ class LWF():
 
     @property
     def hoppings(self):
-        Rlist=[tuple(R) for R in self.Rlist]
+        Rlist = [tuple(R) for R in self.Rlist]
         data = copy.deepcopy(dict(zip(Rlist, self.HwannR)))
         np.fill_diagonal(data[(0, 0, 0)], 0.0)
         return data
 
     @property
     def site_energies(self):
-        iR=self.Rdict[(0,0,0)]
+        iR = self.Rdict[(0, 0, 0)]
         return np.real(np.diag(self.HwannR[iR]))
-
 
     def HR(self, R):
         iR = self.Rdict[tuple(R)]
@@ -62,20 +64,23 @@ class LWF():
         return np.array(evals), np.array(evecs)
 
     def get_wann_largest_basis(self):
-        ret=[]
+        ret = []
         for iwann in range(self.nwann):
-            a=np.abs(self.wannR[:,:, iwann])
+            a = np.abs(self.wannR[:, :, iwann])
             ind = np.unravel_index(np.argmax(a, axis=None), a.shape)
-            ret.append({'R':self.Rlist[ind[0]], 'orb':ind[1]})
+            ret.append({'R': self.Rlist[ind[0]], 'orb': ind[1]})
         return ret
 
-    def write_nc(self, fname, prefix='wann_'):
+    def write_nc(self, fname, prefix='wann_', atoms=None):
         root = Dataset(fname, 'w')
         ndim = root.createDimension('ndim', self.ndim)
         nR = root.createDimension('nR', self.nR)
-        three = root.createDimension('three', self.nR)
+        three = root.createDimension('three', 3)
         nwann = root.createDimension(prefix + 'nwann', self.nwann)
         nbasis = root.createDimension(prefix + 'nbasis', self.nbasis)
+
+        if atoms is not None:
+            natom = root.createDimension(prefix + 'natom', len(atoms))
 
         Rlist = root.createVariable(prefix + 'Rlist',
                                     float,
@@ -104,6 +109,28 @@ class LWF():
 
         #root.createVariable(prefix+'xred', float64, dimensions=(nR, nwann, nwann))
         #root.createVariable(prefix+'cell', float64, dimensions=(nR, nwann, nwann))
+        if atoms is not None:
+            cell = root.createVariable(prefix + "cell",
+                                       float,
+                                       dimensions=('three', 'three'),
+                                       zlib=True)
+            numbers = root.createVariable(prefix + "atomic_numbers",
+                                          int,
+                                          dimensions=(prefix + 'natom'),
+                                          zlib=True)
+            xred = root.createVariable(prefix + "xred",
+                                       float,
+                                       dimensions=(prefix + "natom", "three"))
+
+            xcart = root.createVariable(prefix + "xcart",
+                                        float,
+                                        dimensions=(prefix + "natom", "three"))
+
+            cell[:] = atoms.get_cell().array
+            numbers[:] = atoms.get_atomic_numbers()
+            xred[:] = atoms.get_scaled_positions()
+            xcart[:] = atoms.get_positions()
+
         Rlist[:] = np.array(self.Rlist)
         ifc_real[:] = np.real(self.HwannR)
         ifc_imag[:] = np.imag(self.HwannR)
@@ -118,6 +145,12 @@ class LWF():
         nR = root.dimensions['nR'].size
         nwann = root.dimensions[prefix + 'nwann'].size
         nbasis = root.dimensions[prefix + 'nbasis'].size
+        try:
+            natom = root.dimensions[prefix + 'natom'].size
+            has_atom = True
+        except:
+            has_atom = False
+            atoms = None
 
         Rlist = root.variables[prefix + 'Rlist'][:]
         ifc_real = root.variables[prefix + 'ifc_real'][:]
@@ -128,10 +161,28 @@ class LWF():
         wannR_imag = root.variables[prefix + 'wannier_function_imag'][:]
         wannR = wannR_real + wannR_imag * 1.0j
         # FIXME: cell and wann_centers
-        return LWF(wannR, ifc, Rlist, cell=np.eye(3), wann_centers=np.zeros((nwann, ndim)))
+        if has_atom:
+            numbers = root.variables[prefix + 'atomic_numbers'][:]
+            xcart = root.variables[prefix + 'xcart'][:]
+            cell = root.variables[prefix + 'cell'][:]
+
+        atoms = Atoms(numbers, cell=cell, positions=xcart)
+        return LWF(wannR,
+                   ifc,
+                   Rlist,
+                   cell=np.eye(3),
+                   wann_centers=np.zeros((nwann, ndim)),
+                   atoms=atoms)
 
 
-
+    def make_supercell(self, sc_maker=None, sc_matrix=None):
+        from minimulti.utils.supercell import SupercellMaker
+        if sc_maker is None:
+            sc_maker = SupercellMaker(sc_matrix)
+        if self.atoms is not None:
+            sc_atoms = sc_maker.sc_atoms(self.atoms)
+        sc_Rlist, sc_HR = sc_maker.sc_Rlist_HR(self.Rlist, self.HwannR)
+        return sc_atoms, sc_Rlist, sc_HR
 
     def get_num_orbitals(self):
         return self.nwann
@@ -183,7 +234,11 @@ class LWF_COHP(LWF):
         wannR_imag = root.variables[prefix + 'wannier_function_imag'][:]
         wannR = wannR_real + wannR_imag * 1.0j
 
-        return LWF_COHP(wannR, ifc, Rlist, cell=np.eye(3), wann_centers=np.zeros((nwann, ndim)))
+        return LWF_COHP(wannR,
+                        ifc,
+                        Rlist,
+                        cell=np.eye(3),
+                        wann_centers=np.zeros((nwann, ndim)))
         #return LWF_COHP(wannR, ifc, Rlist)
 
 
@@ -245,7 +300,7 @@ def test_load():
     #print(Eon)
     from minimulti.electron.COHP import COHP
     cohp = COHP(lwf)
-    ax=cohp.plot_COHP_fatband(
+    ax = cohp.plot_COHP_fatband(
         #iblock=(5, 6, 8, 10),
         #iblock=(4, 5, 7, 9),
         #iblock=(4, 5, 7, 9),
@@ -262,6 +317,3 @@ def test_load():
     ax.axhline(linestyle='--', color='black')
     plt.savefig('COHP_alpha1.0.png')
     plt.show()
-
-
-#test_load()

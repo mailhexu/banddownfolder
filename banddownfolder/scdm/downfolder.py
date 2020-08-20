@@ -1,23 +1,24 @@
-from banddownfolder.electron.wannier90 import wannier_to_model
-from banddownfolder.scdm.scdmk import WannierProjectedBuilder, WannierScdmkBuilder, occupation_func
-from ase.dft.kpoints import monkhorst_pack
-from tbmodels import Model
-from banddownfolder.electron.ijR import ijR
-import matplotlib.pyplot as plt
-import pickle
 import os
-from banddownfolder.plot import plot_band
-from banddownfolder.electron.sislwrapper import SislWrapper
-from banddownfolder.electron.phononwrapper import PhonopyWrapper
-import numpy as np
 import json
+from ase.dft.kpoints import monkhorst_pack
+import numpy as np
+from banddownfolder.scdm.scdmk import (WannierProjectedBuilder,
+                                       WannierScdmkBuilder, occupation_func)
+import matplotlib.pyplot as plt
+from banddownfolder.plot import plot_band
+from banddownfolder.wrapper.ijR import ijR
+from banddownfolder.wrapper.wannier90 import wannier_to_model
+from banddownfolder.wrapper.sislwrapper import SislWrapper
+from banddownfolder.wrapper.phonopywrapper import PhonopyWrapper
+from banddownfolder.wrapper.myTB import MyTB
 
+#from tbmodels import Model
 
-def save_Wannier_model():
-    m = Model.from_wannier_folder(folder='/home/hexu/projects/SMO_Wannier/',
-                                  prefix='abinito_w90_down')
-    mijR = ijR.from_tbmodel(m)
-    mijR.save(fname='SMO_tb.nc')
+#def save_Wannier_model():
+#    m = Model.from_wannier_folder(folder='/home/hexu/projects/SMO_Wannier/',
+#                                  prefix='abinito_w90_down')
+#    mijR = ijR.from_tbmodel(m)
+#    mijR.save(fname='SMO_tb.nc')
 
 
 def read_model():
@@ -26,18 +27,18 @@ def read_model():
 
 
 def make_builder(model,
-                kmesh,
-                nwann,
-                has_phase=False,
-                weight_func='unity',
-                mu=0,
-                sigma=0.01,
-                exclude_bands=[],
-                use_proj=False,
-                method='projected',
-                selected_basis=[],
-                anchor_kpt=(0,0,0),
-                anchors=None):
+                 kmesh,
+                 nwann,
+                 has_phase=False,
+                 weight_func='unity',
+                 mu=0,
+                 sigma=0.01,
+                 exclude_bands=[],
+                 use_proj=False,
+                 method='projected',
+                 selected_basis=[],
+                 anchor_kpt=(0, 0, 0),
+                 anchors=None):
     k = kmesh[0]
     kpts = monkhorst_pack(kmesh)
     evals, evecs = model.solve_all(kpts)
@@ -82,28 +83,29 @@ def make_builder(model,
     return wann_builder
 
 
-
 class BandDownfolder():
-    def __init__(self, mijR):
+    def __init__(self, model):
         """
         Setup the model
         """
         self.model = model
 
-    def downfold(self,
-                 method='scdmk',
-                 kmesh=(5, 5, 5),
-                 nwann=0,
-                 weight_func='unity',
-                 mu=0.0,
-                 sigma=2.0,
-                 selected_basis=None,
-                 anchors=None,
-                 anchor_kpt=(0,0,0),
-                 use_proj=True,
-                 exclude_bands=[],
-                 write_hr_nc='Downfolded_hr.nc',
-                 write_hr_txt='Downfolded_hr.txt'):
+    def downfold(
+        self,
+        method='scdmk',
+        kmesh=(5, 5, 5),
+        nwann=0,
+        weight_func='unity',
+        mu=0.0,
+        sigma=2.0,
+        selected_basis=None,
+        anchors=None,
+        anchor_kpt=(0, 0, 0),
+        use_proj=True,
+        exclude_bands=[],
+        write_hr_nc='Downfolded_hr.nc',
+        write_hr_txt='Downfolded_hr.txt',
+    ):
         """
         Downfold the Band structure.
         The method first get the eigenvalues and eigenvectors in a Monkhorst-Pack grid from the model.
@@ -131,25 +133,27 @@ class BandDownfolder():
         write_hr_nc: write the Hamiltonian into a netcdf file. It require the NETCDF4 python library. use write_nc=None if not needed.
         write_hr_txt: write the Hamiltonian into a txt file.
         """
-        self.builder=make_builder(self.model,
-                               method=method,
-                               kmesh=kmesh,
-                               nwann=nwann,
-                               weight_func=weight_func,
-                               mu=mu,
-                               sigma=sigma,
-                               selected_basis=selected_basis,
-                               anchors=anchors,
-                               anchor_kpt=anchor_kpt,
-                               use_proj=use_proj,
-                               exclude_bands=exclude_bands,
-                               )
-        self.ewf =self.builder.get_wannier()
+        self.builder = make_builder(
+            self.model,
+            method=method,
+            kmesh=kmesh,
+            nwann=nwann,
+            weight_func=weight_func,
+            mu=mu,
+            sigma=sigma,
+            selected_basis=selected_basis,
+            anchors=anchors,
+            anchor_kpt=anchor_kpt,
+            use_proj=use_proj,
+            exclude_bands=exclude_bands,
+        )
+        self.atoms=self.model.atoms
+        self.ewf = self.builder.get_wannier()
         self._post_downfold()
         if write_hr_txt is not None:
             self.ewf.save_txt(write_hr_txt)
         if write_hr_nc is not None:
-            self.ewf.write_nc(write_hr_nc)
+            self.ewf.write_nc(write_hr_nc, atoms=self.atoms)
         return self.ewf
 
     def _post_downfold(self):
@@ -187,18 +191,19 @@ class BandDownfolder():
         savefig: the filename of the figure to be saved.
         show: whether to show the band structure.
         """
-        ax = plot_band(self.model,
-                       kvectors=kvectors,
-                       knames=knames,
-                       supercell_matrix=supercell_matrix,
-                       npoints=npoints,
-                       color=fullband_color,
-                       alpha=0.8,
-                       marker='',
-                       erange=erange,
-                       efermi=efermi,
-                       cell=cell,
-                       ax=ax)
+        if True:
+            ax = plot_band(self.model,
+                           kvectors=kvectors,
+                           knames=knames,
+                           supercell_matrix=supercell_matrix,
+                           npoints=npoints,
+                           color=fullband_color,
+                           alpha=0.8,
+                           marker='',
+                           erange=erange,
+                           efermi=efermi,
+                           cell=cell,
+                           ax=ax)
         ax = plot_band(self.ewf,
                        kvectors=kvectors,
                        knames=knames,
@@ -224,12 +229,19 @@ class W90Downfolder(BandDownfolder):
         prefix,   # The prefix of Wannier90 outputs. e.g. wannier90_up
         """
 
-        m = Model.from_wannier_folder(folder=folder, prefix=prefix)
-        self.model = ijR.from_tbmodel(m)
+        #m = Model.from_wannier_folder(folder=folder, prefix=prefix)
+        #m=
+        m = MyTB.read_from_wannier_dir(folder, prefix)
+        self.model = m
 
 
 class SislDownfolder(BandDownfolder):
-    def __init__(self, folder=None, fdf_file=None, H=None, spin=None, recover_fermi=False):
+    def __init__(self,
+                 folder=None,
+                 fdf_file=None,
+                 H=None,
+                 spin=None,
+                 recover_fermi=False):
         """
         Parameters:
         ========================================
@@ -240,39 +252,81 @@ class SislDownfolder(BandDownfolder):
             import sisl
         except ImportError:
             raise ImportError("sisl is needed. Do you have sisl installed?")
-        shift_fermi=None
+        shift_fermi = None
         if H is None:
             fdf = sisl.get_sile(os.path.join(folder, fdf_file))
             fdf.read()
             H = fdf.read_hamiltonian()
-            self.efermi=fdf.read_fermi_level().data[0]
+            self.efermi = fdf.read_fermi_level().data[0]
             if recover_fermi:
-                self.shift_fermi=self.efermi
+                self.shift_fermi = self.efermi
         self.model = SislWrapper(H, spin=spin, shift_fermi=shift_fermi)
-
-
+        self.atoms = self.model.atoms
 
     def _post_downfold(self, fname='Downfold.json'):
-        cols=self.builder.cols
+        cols = self.builder.cols
         #print(f"All orbs:{self.model.orbs}")
-        self.orbs=[self.model.orbs[i] for i in cols]
+        self.orbs = [self.model.orbs[i] for i in cols]
         #print(f"Selected cols: {cols}")
         #print(f"Selected orbs: {self.orbs}")
         #b=self.ewf.get_wann_largest_basis()
         #print(f"largest: {b}, {self.model.orbs[b]}")
-        atoms=self.model.atoms
+        atoms = self.model.atoms
         with open(fname, 'w') as myfile:
-            json.dump({'selected_columns': cols.tolist(),
-                       'Orb_names' : tuple(self.orbs),
-                       'Efermi': self.efermi,
-                       'chemical_symbols': atoms.get_chemical_symbols(),
-                       'atom_xred': atoms.get_scaled_positions().tolist(),
-                       'cell': atoms.get_cell().tolist()
-                        
-            },myfile, sort_keys=True, indent=4)
+            json.dump(
+                {
+                    'selected_columns': cols.tolist(),
+                    'Orb_names': tuple(self.orbs),
+                    'Efermi': self.efermi,
+                    'chemical_symbols': atoms.get_chemical_symbols(),
+                    'atom_xred': atoms.get_scaled_positions().tolist(),
+                    'cell': atoms.get_cell().tolist()
+                },
+                myfile,
+                sort_keys=True,
+                indent=4)
 
-class PhonopyDownfolder(BandDownfolder):
-    def __init__(self,  phonon=None, *argv, **kwargs):
+    def wannier_on_grid(self, i, k=None, grid_prec=0.2, grid=None, geom=None):
+        '''
+        Projects the wannier function on a grid
+        '''
+
+        #all_coeffs = DataArray(self.ewf.wannR, dims=('k', 'orb', 'wannier'))
+        wannR = self.ewf.wannR
+
+        # Use the geometry of the hamiltonian if the user didn't provide one (usual case)
+        if geom is None:
+            geom = self.model.ham.geom
+
+        # Create a grid if the user didn't provide one
+        if grid is None:
+            grid = sisl.Grid(grid_prec, geometry=geom, dtype=complex)
+
+        # Get the coefficients of that we want
+        #coeffs = all_coeffs.sel(wannier=i)
+        coeffi = wannR[:, :, i]
+        #if k is None:
+        #    coeffs = coeffs.mean('k')
+        #else:
+        #    coeffs = coeffs.sel(k=k)
+
+        # Project the orbitals with the coefficients on the grid
+        wavefunction(coeffs, grid, geometry=geom)
+
+        return grid
+
+
+class PhononDownfolder(BandDownfolder):
+    def __init__(self, model):
+        self.model = model
+        try:
+            self.atoms = self.model.atoms
+        except Exception:
+            self.atoms = None
+
+
+class PhonopyDownfolder(PhononDownfolder):
+    def __init__(self, phonon=None, mode='dm', *argv, **kwargs):
         """
         Parameters:
         ========================================
@@ -282,7 +336,8 @@ class PhonopyDownfolder(BandDownfolder):
         try:
             import phonopy
         except ImportError:
-            raise ImportError("phonopy is needed. Do you have phonopy installed?")
+            raise ImportError(
+                "phonopy is needed. Do you have phonopy installed?")
         if phonon is None:
-            phonon=phonopy.load(*argv, **kwargs)
-        self.model = PhonopyWrapper(phonon)
+            phonon = phonopy.load(*argv, **kwargs)
+        super().__init__(PhonopyWrapper(phonon, mode=mode))
