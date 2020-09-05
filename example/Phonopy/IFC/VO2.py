@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 
 fname = '/home/hexu/projects/VO2/phonopy_params.yaml'
 downfolder=PhonopyDownfolder(phonopy_yaml=fname, mode='ifc')
-downfolder.downfold(method='scdmk',nwann=2, selected_basis=[2,5], 
-                    #anchors={(.5,0.0,.5):(1,0)},
-                    use_proj=True, mu=-10, sigma=8, weight_func='Gauss', kmesh=(3,3,5))
+downfolder.downfold(method='scdmk',nwann=2,# selected_basis=[2,5], 
+                    anchors={(.5,0.0,.5):(1,0)},
+                    use_proj=True, mu=-10, sigma=158, weight_func='Gauss', kmesh=(3,3,5))
 write('POSCAR.vasp', downfolder.model.atoms, vasp5=True)
 ax=downfolder.plot_band_fitting(kvectors=np.array([[0. , 0. , 0. ],
            [0.5, 0.5 , 0. ],

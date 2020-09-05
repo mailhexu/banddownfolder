@@ -55,6 +55,30 @@ class WannierBuilder():
         #eigen
         self.evals = np.array(evals, dtype=float)
         self.kpts = np.array(kpts, dtype=float)
+        # TODO: Remove me.modify evals
+        shift=1.0
+        shift2=shift-0.01
+        ik=self.find_k((0.5, 0, 0.5))
+        print(ik)
+        self.evals[ik,0]-=shift
+        self.evals[ik,1]-=shift2
+        
+        ik=self.find_k((0.5, 0, -0.5))
+        print(ik)
+        self.evals[ik,0]-=shift
+        self.evals[ik,1]-=shift2
+        
+
+        ik=self.find_k((-0.5, 0, -0.5))
+        print(ik)
+        self.evals[ik,0]-=shift
+        self.evals[ik,1]-=shift2
+        
+        ik=self.find_k((-0.5, 0, 0.5))
+        print(ik)
+        self.evals[ik,0]-=shift
+        self.evals[ik,1]-=shift2
+ 
         self.ndim = self.kpts.shape[1]
         self.nkpt, self.nbasis, self.nband = np.shape(wfn)
         if Sk is None:

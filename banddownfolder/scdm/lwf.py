@@ -44,7 +44,7 @@ class LWF():
         for iR, R in enumerate(self.Rlist):
             phase = np.exp(2j * np.pi * np.dot(R, k))
             hk += self.HwannR[iR, :, :] * phase
-        hk = (hk + hk.T.conj()) / 2
+        #hk = (hk + hk.T.conj()) / 2
         return hk
 
     def solve_wann_k(self, k, ham=False):
@@ -181,7 +181,8 @@ class LWF():
             sc_maker = SupercellMaker(sc_matrix)
         if self.atoms is not None:
             sc_atoms = sc_maker.sc_atoms(self.atoms)
-        sc_Rlist, sc_HR = sc_maker.sc_Rlist_HR(self.Rlist, self.HwannR)
+        print(self.HwannR.shape)
+        sc_Rlist, sc_HR = sc_maker.sc_Rlist_HR(self.Rlist, self.HwannR, n_basis=self.nwann)
         return sc_atoms, sc_Rlist, sc_HR
 
     def get_num_orbitals(self):
@@ -239,7 +240,6 @@ class LWF_COHP(LWF):
                         Rlist,
                         cell=np.eye(3),
                         wann_centers=np.zeros((nwann, ndim)))
-        #return LWF_COHP(wannR, ifc, Rlist)
 
 
 strx = """0.         0.04728673 0.09457345 0.14186018 0.18914691 0.23643363

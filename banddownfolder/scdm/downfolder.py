@@ -228,9 +228,6 @@ class W90Downfolder(BandDownfolder):
         folder   # The folder containing the Wannier function files
         prefix,   # The prefix of Wannier90 outputs. e.g. wannier90_up
         """
-
-        #m = Model.from_wannier_folder(folder=folder, prefix=prefix)
-        #m=
         m = MyTB.read_from_wannier_dir(folder, prefix)
         self.model = m
 
