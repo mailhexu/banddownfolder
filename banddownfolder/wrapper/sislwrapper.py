@@ -59,7 +59,17 @@ class SislWrapper():
             self.norb=len(self.orbs)/2
             self.nbasis= len(self.orbs)
         else:
-            raise ValueError("The hamiltonian should be either spin-orbit or colinear")
+            for ia, a in enumerate(_atoms):
+                symnum=sdict[ia]
+                orb_names=[]
+                for x in a.orbital:
+                    name=f"{symnum}|{x.name()}|None"
+                    orb_names.append(name)
+                    self.positions.append(xred[ia])
+                self.orbs+=orb_names
+                self.orb_dict[ia]+=orb_names
+            self.norb=len(self.orbs)
+            self.nbasis= len(self.orbs)
         self.positions=np.array(self.positions, dtype=float)
 
 

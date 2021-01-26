@@ -103,6 +103,7 @@ class BandDownfolder():
         anchor_kpt=(0, 0, 0),
         use_proj=True,
         exclude_bands=[],
+        post_func=None,
         write_hr_nc='Downfolded_hr.nc',
         write_hr_txt='Downfolded_hr.txt',
     ):
@@ -149,6 +150,8 @@ class BandDownfolder():
         )
         self.atoms=self.model.atoms
         self.ewf = self.builder.get_wannier()
+        if post_func is not None:
+            post_func(self.ewf)
         self._post_downfold()
         if write_hr_txt is not None:
             self.ewf.save_txt(write_hr_txt)
@@ -219,7 +222,8 @@ class BandDownfolder():
         if savefig is not None:
             plt.savefig(savefig)
         if show:
-            plt.show()
+            plt.show()  
+        return ax
 
 
 class W90Downfolder(BandDownfolder):

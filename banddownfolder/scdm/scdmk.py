@@ -7,6 +7,7 @@ from scipy.linalg import qr, svd, norm, eigh
 from scipy.special import erfc
 from netCDF4 import Dataset
 from ase.dft.kpoints import get_monkhorst_pack_size_and_offset
+from banddownfolder.utils.kpoints import kmesh_to_R, build_Rgrid
 from banddownfolder.scdm.lwf import LWF
 
 
@@ -17,23 +18,6 @@ def scdm(psiT, ncol):
     _Q, _R, piv = qr(psiT, mode='full', pivoting=True)
     cols = piv[:ncol]
     return cols
-
-
-def kmesh_to_R(kmesh):
-    k1, k2, k3 = kmesh
-    Rlist = [(R1, R2, R3) for R1 in range(-k1 // 2 + 1, k1 // 2 + 1)
-             for R2 in range(-k2 // 2 + 1, k2 // 2 + 1)
-             for R3 in range(-k3 // 2 + 1, k3 // 2 + 1)]
-    return np.array(Rlist)
-
-
-def build_Rgrid(R):
-    l1, l2, l3 = R
-    Rlist = [(R1, R2, R3) for R1 in range(-l1 // 2 + 1, l1 // 2 + 1)
-             for R2 in range(-l2 // 2 + 1, l2 // 2 + 1)
-             for R3 in range(-l3 // 2 + 1, l3 // 2 + 1)]
-    return np.array(Rlist)
-
 
 class WannierBuilder():
     """
@@ -56,28 +40,29 @@ class WannierBuilder():
         self.evals = np.array(evals, dtype=float)
         self.kpts = np.array(kpts, dtype=float)
         # TODO: Remove me.modify evals
-        shift=1.0
-        shift2=shift-0.01
-        ik=self.find_k((0.5, 0, 0.5))
-        print(ik)
-        self.evals[ik,0]-=shift
-        self.evals[ik,1]-=shift2
-        
-        ik=self.find_k((0.5, 0, -0.5))
-        print(ik)
-        self.evals[ik,0]-=shift
-        self.evals[ik,1]-=shift2
-        
-
-        ik=self.find_k((-0.5, 0, -0.5))
-        print(ik)
-        self.evals[ik,0]-=shift
-        self.evals[ik,1]-=shift2
-        
-        ik=self.find_k((-0.5, 0, 0.5))
-        print(ik)
-        self.evals[ik,0]-=shift
-        self.evals[ik,1]-=shift2
+        if False:
+            shift=0.3
+            shift2=shift-0.01
+            ik=self.find_k((0.5, 0, 0.5))
+            print(ik)
+            self.evals[ik,0]-=shift
+            self.evals[ik,1]-=shift2
+            
+            ik=self.find_k((0.5, 0, -0.5))
+            print(ik)
+            self.evals[ik,0]-=shift
+            self.evals[ik,1]-=shift2
+            
+    
+            ik=self.find_k((-0.5, 0, -0.5))
+            print(ik)
+            self.evals[ik,0]-=shift
+            self.evals[ik,1]-=shift2
+            
+            ik=self.find_k((-0.5, 0, 0.5))
+            print(ik)
+            self.evals[ik,0]-=shift
+            self.evals[ik,1]-=shift2
  
         self.ndim = self.kpts.shape[1]
         self.nkpt, self.nbasis, self.nband = np.shape(wfn)
@@ -94,7 +79,6 @@ class WannierBuilder():
         self.nband = len(self.ibands)
         self.nwann = nwann
         self.positions = positions
-        print(self.positions.shape)
         # kpts
         self.nkpt = self.kpts.shape[0]
         self.kmesh, self.k_offset = get_monkhorst_pack_size_and_offset(
@@ -228,7 +212,7 @@ class WannierBuilder():
     def _assure_normalized(self):
         # FIXME: Use overlap matrix.
         for iwann in range(self.nwann):
-            norm=np.trace(self.HwannR[:,:, iwann].conj().T@self.HwannR[:, :, iwann])
+            norm=np.trace(self.wannR[:,:, iwann].conj().T@self.wannR[:, :, iwann])
             print(f"Norm {iwann}: {norm}")
 
     def k_to_R(self):
@@ -237,7 +221,7 @@ class WannierBuilder():
         """
         for iR, R in enumerate(self.Rlist):
             for ik, k in enumerate(self.kpts):
-                phase = np.exp(-2j * np.pi * np.dot(R, k))
+                phase = np.exp(2j * np.pi * np.dot(R, k))
                 self.HwannR[iR] += self.Hwann_k[
                     ik, :, :] * phase * self.kweight[ik]
                 self.wannR[iR] += self.wannk[
@@ -436,6 +420,21 @@ class WannierScdmkBuilder(WannierBuilder):
         """
         calculate Amn for one k point using scdmk method.
         """
+        #ik=self.find_k(kpt)
+        #psi = self.get_psi_k(ik)[:, :] * self.occ[ik][None, :]
+        #psi_Dagger=psi.T.conj()
+        #self.cols = scdm(psi_Dagger, self.nwann)
+        #if self.sort_cols:
+        #    self.cols=np.sort(self.cols)
+
+        if False:
+            psi = self.get_psi_k(ik)[:, :] * (self.occ[ik]*self.projs[ik])[None, :]
+    
+            psi_Dagger=psi.T.conj()
+            cols = scdm(psi_Dagger, self.nwann)
+            if self.sort_cols:
+                cols=np.sort(cols)
+    
         if self.use_proj:
             #psi = self.get_psi_k(ik)[self.cols, :] @ np.diag(
             #    self.occ[ik] * self.projs[ik])
@@ -443,12 +442,24 @@ class WannierScdmkBuilder(WannierBuilder):
                                                       self.projs[ik])[None, :]
         else:
             psi = self.get_psi_k(ik)[self.cols, :] * self.occ[ik][None, :]
-        #psiN = psi / norm(psi)
-        #psiN = psi/norm(psi, axis=0)[None, :]
-        #U, _S, VT = svd(psi.T.conj(), full_matrices=False)
         U, _S, VT = svd(psi.T.conj(), full_matrices=False)
         Amn_k = U @ VT
         return Amn_k
+
+    def get_Amn_one_k_old(self, ik):
+        """
+        calculate Amn for one k point using scdmk method.
+        """
+        if self.use_proj:
+            psi = self.get_psi_k(ik)[self.cols, :] * (self.occ[ik] *
+                                                      self.projs[ik])[None, :]
+        else:
+            psi = self.get_psi_k(ik)[self.cols, :] * self.occ[ik][None, :]
+        U, _S, VT = svd(psi.T.conj(), full_matrices=False)
+        Amn_k = U @ VT
+        return Amn_k
+
+ 
 
     def prepare(self):
         """
@@ -501,7 +512,7 @@ def Hk_to_Hreal(Hk, kpts, kweight, Rpts):
     for iR, R in enumerate(Rpts):
         HR = np.zeros((nR, nbasis, nbasis), dtype=complex)
         for ik, k in enumerate(kpts):
-            phase = np.exp(-2j * np.pi * np.dot(R, k))
+            phase = np.exp(2j * np.pi * np.dot(R, k))
             HR[iR] += Hk[ik] * phase * kweight[ik]
     return HR
 
