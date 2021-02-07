@@ -5,7 +5,12 @@
 
 Welcome to BandDownfolder's documentation!
 ==================================================
-BandDownfolder is 
+BandDownfolder is a python package to build Wannier functions of electron/lattice/magnon/etc.
+The features include:
+ 
+
+ The source code can be found at `https://github.com/mailhexu/banddownfolder <https://github.com/mailhexu/banddownfolder>`_.
+
 
 .. toctree::
    :maxdepth: 2
