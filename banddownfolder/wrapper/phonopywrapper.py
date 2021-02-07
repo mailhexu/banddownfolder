@@ -102,11 +102,10 @@ class PhonopyWrapper():
         
 
 
-def func(evals):
-    return np.where(evals<0, -0.6*evals+0.01, evals+0.01)
 
-#func=None
-def test():
+def save_ifc_and_show_phonon(fname = 'phonopy_params.yaml',
+    ifc_fname='ifc.nc', kmesh=[3,3,3], assure_ASR=True,
+    knames=['$\\Gamma$', 'M','A', 'Z','R', 'M', '$\\Gamma$', 'Z'],
     kvectors=np.array([[0. , 0. , 0. ],
            [0.5, 0.5 , 0. ],
            [0.5, 0.5, 0.5],
@@ -116,20 +115,17 @@ def test():
            [0,0,0],
            [0.0,0.0,0.5]
            ]),
-    knames=['$\\Gamma$', 'M','A', 'Z','R', 'M', '$\\Gamma$', 'Z'] 
-    fname = '/home/hexu/projects/VO2/phonopy_params.yaml'
-    #fname = '/home/hexu/projects/VO2/phonon/PBEsolU_FM/phonopy_params.yaml'
+):
     phonon = load(phonopy_yaml=fname)
     phon = PhonopyWrapper(phonon, mode='ifc')
     ax=phon.plot_band(color='blue', kvectors=kvectors, knames=knames)
 
-    Rpts, HR=phon.get_ifc(kmesh=[3,3,5], eval_modify_function=func, assure_ASR=False)
-    phon.save_ifc(fname='R_VO2_ifc_scaled.nc', kmesh=[3,3,5], eval_modify_function=func, assure_ASR=False)
+    phon.save_ifc(fname=ifc_fname, kmesh=kmesh, eval_modify_function=None, assure_ASR=assure_ASR)
+    Rpts, HR=phon.get_ifc(kmesh=kmesh, eval_modify_function=None, assure_ASR=assure_ASR)
     ifc=IFC(phon.atoms, Rpts, HR)
     ifc.plot_band(ax=ax, color='red',kvectors=kvectors, knames=knames)
     plt.ylabel("FC (eV/$\AA^2$) ")
-    plt.savefig('compare.pdf')
     plt.show()
 
 if __name__ == '__main__':
-    test()
+    save_ifc_and_show_phonon()

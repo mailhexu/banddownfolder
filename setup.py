@@ -11,12 +11,10 @@ setup(
     packages=find_packages(),
     package_data={},
     install_requires=['numpy', 'scipy',  'matplotlib', 'ase', 'numba', 
-        #'tbmodels', 
-        #'pythtb',
         'netcdf4',
         'jupyter',
         ],
-    scripts=[
+    scripts=['scripts/phonopy_to_netcdf.py'
         ],
     classifiers=[
         'Development Status :: 3 - Alpha',
