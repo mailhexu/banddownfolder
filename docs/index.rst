@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 Welcome to BandDownfolder's documentation!
-================================
+==================================================
 BandDownfolder is 
 
 .. toctree::
