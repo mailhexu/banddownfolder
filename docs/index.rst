@@ -7,6 +7,10 @@ Welcome to BandDownfolder's documentation!
 ==================================================
 BandDownfolder is a python package to build Wannier functions of electron/lattice/magnon/etc.
 The features include:
+ * Building electron Wannier function from Siesta Kohn-Sham Hamiltonian
+ * Building lattice Wannier function from interatomic force constant in Anaddb and Phonopy
+ * SCDM-k and projected Wannier function method.
+ * Interfaced with Multibinit lattice Wannier function dynamics.
  
 
  The source code can be found at `https://github.com/mailhexu/banddownfolder <https://github.com/mailhexu/banddownfolder>`_.
@@ -20,8 +24,8 @@ The features include:
    src/tutor.md
    src/ReleaseNotes.rst
 ..
+   src/references.md
    src/Contributors.rst
-   src/references
 
 
 Indices and tables
