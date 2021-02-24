@@ -37,7 +37,7 @@ class SislWrapper():
             for ia, a in enumerate(_atoms):
                 symnum=sdict[ia]
                 orb_names=[]
-                for x in a.orbital:
+                for x in a.orbitals:
                     name=f"{symnum}|{x.name()}|{spin}"
                     orb_names.append(name)
                     self.positions.append(xred[ia])
@@ -62,7 +62,7 @@ class SislWrapper():
             for ia, a in enumerate(_atoms):
                 symnum=sdict[ia]
                 orb_names=[]
-                for x in a.orbital:
+                for x in a.orbitals:
                     name=f"{symnum}|{x.name()}|None"
                     orb_names.append(name)
                     self.positions.append(xred[ia])
@@ -91,7 +91,7 @@ class SislWrapper():
         else:
             return self.ham.Hk(k, format=format)
 
-    def solve_all(self, kpts, orth=True):
+    def solve_all(self, kpts, orth=False):
         evals = []
         evecs = []
         for ik, k in enumerate(kpts):

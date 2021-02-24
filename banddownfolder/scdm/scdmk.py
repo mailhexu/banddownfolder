@@ -19,6 +19,7 @@ def scdm(psiT, ncol):
     cols = piv[:ncol]
     return cols
 
+
 class WannierBuilder():
     """
     General Wannier function builder
@@ -113,6 +114,7 @@ class WannierBuilder():
         self.wannR = np.zeros((self.nR, self.nbasis, self.nwann),
                               dtype=complex)
 
+
     def get_wannier(self):
         """
         Calculate Wannier functions
@@ -136,6 +138,7 @@ class WannierBuilder():
         """
         return self.psi[ikpt][ :, self.ibands]
         #return self.psi[ikpt, :, self.ibands]  # A bug in numpy found!! The matrix get transposed.
+        # Not a bug, but defined behavior (though confusing).
 
     def get_eval_k(self, ikpt):
         """
@@ -197,7 +200,6 @@ class WannierBuilder():
             self.wannk[ik] = self.get_psi_k(ik) @ self.Amn[ik, :, :]
             h = self.Amn[ik, :, :].T.conj() @ np.diag(
                 self.get_eval_k(ik)) @ self.Amn[ik, :, :]
-            #h = (h + h.T.conj()) / 2
             self.Hwann_k[ik] = h
         return self.wannk, self.Hwann_k
 
@@ -210,7 +212,10 @@ class WannierBuilder():
         print(f"Wannier Centers: {self.wann_centers}")
 
     def _assure_normalized(self):
-        # FIXME: Use overlap matrix.
+        """
+        make sure that all the Wannier functions are normalized
+        # TODO: should we use overlap matrix for non-orthogonal basis?
+        """
         for iwann in range(self.nwann):
             norm=np.trace(self.wannR[:,:, iwann].conj().T@self.wannR[:, :, iwann])
             print(f"Norm {iwann}: {norm}")
@@ -253,11 +258,13 @@ class WannierBuilder():
 class WannierProjectedBuilder(WannierBuilder):
     """
     Projected Wannier functions.
+    We define a set of projectors, which is a nwann*nbasis matrix.
+    Each projector is vector of size nbasis.
     """
     def set_projectors_with_anchors(self, anchors):
         """
-        Use
-        anchors is a dictionary: {kpt1: (band1, iband2...), kpt2: ...}
+        Use one eigen vector (defined as anchor point) as projector.
+        anchors: a dictionary: {kpt1: (band1, iband2...), kpt2: ...}
         """
         self.projectors = []
         for k, ibands in anchors.items():

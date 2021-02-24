@@ -1,4 +1,5 @@
 import os
+import copy
 import json
 from ase.dft.kpoints import monkhorst_pack
 import numpy as np
@@ -11,19 +12,6 @@ from banddownfolder.wrapper.wannier90 import wannier_to_model
 from banddownfolder.wrapper.sislwrapper import SislWrapper
 from banddownfolder.wrapper.phonopywrapper import PhonopyWrapper
 from banddownfolder.wrapper.myTB import MyTB
-
-#from tbmodels import Model
-
-#def save_Wannier_model():
-#    m = Model.from_wannier_folder(folder='/home/hexu/projects/SMO_Wannier/',
-#                                  prefix='abinito_w90_down')
-#    mijR = ijR.from_tbmodel(m)
-#    mijR.save(fname='SMO_tb.nc')
-
-
-def read_model():
-    m = ijR.load_ijR('SMO_tb.nc')
-    return m
 
 
 def make_builder(model,
@@ -47,6 +35,7 @@ def make_builder(model,
     except Exception:
         positions = None
     weight_func = occupation_func(ftype=weight_func, mu=mu, sigma=sigma)
+
     if method == "scdmk":
         wann_builder = WannierScdmkBuilder(evals=evals,
                                            wfn=evecs,
@@ -80,6 +69,8 @@ def make_builder(model,
             wann_builder.set_projectors_with_basis(selected_basis)
         elif anchors:
             wann_builder.set_projectors_with_anchors(anchors)
+    else:
+        raise ValueError("method should be scdmk or projected")
     return wann_builder
 
 
@@ -89,24 +80,22 @@ class BandDownfolder():
         Setup the model
         """
         self.model = model
+        self.params = {}
 
-    def downfold(
-        self,
-        method='scdmk',
-        kmesh=(5, 5, 5),
-        nwann=0,
-        weight_func='unity',
-        mu=0.0,
-        sigma=2.0,
-        selected_basis=None,
-        anchors=None,
-        anchor_kpt=(0, 0, 0),
-        use_proj=True,
-        exclude_bands=[],
-        post_func=None,
-        write_hr_nc='Downfolded_hr.nc',
-        write_hr_txt='Downfolded_hr.txt',
-    ):
+    def set_parameters(self,
+                       method='scdmk',
+                       kmesh=(5, 5, 5),
+                       nwann=0,
+                       weight_func='unity',
+                       mu=0.0,
+                       sigma=2.0,
+                       selected_basis=None,
+                       anchors=None,
+                       anchor_kpt=(0, 0, 0),
+                       use_proj=True,
+                       exclude_bands=[],
+                       post_func=None,
+        ):
         """
         Downfold the Band structure.
         The method first get the eigenvalues and eigenvectors in a Monkhorst-Pack grid from the model.
@@ -114,7 +103,7 @@ class BandDownfolder():
         And finally it Fourier transform the new basis functions(Wannier functions) from k-space to real space.
         The Hamiltonian can be written.
 
-        Parameters:
+        Parameters
         ====================================
         method:  the method of downfolding. scdmk|projected
         kmesh,   The k-mesh used for the BZ sampling. e.g. (5, 5, 5)
@@ -134,33 +123,42 @@ class BandDownfolder():
         write_hr_nc: write the Hamiltonian into a netcdf file. It require the NETCDF4 python library. use write_nc=None if not needed.
         write_hr_txt: write the Hamiltonian into a txt file.
         """
-        self.builder = make_builder(
-            self.model,
-            method=method,
-            kmesh=kmesh,
-            nwann=nwann,
-            weight_func=weight_func,
-            mu=mu,
-            sigma=sigma,
-            selected_basis=selected_basis,
-            anchors=anchors,
-            anchor_kpt=anchor_kpt,
-            use_proj=use_proj,
-            exclude_bands=exclude_bands,
-        )
-        self.atoms=self.model.atoms
+
+        self.params = copy.deepcopy(locals())
+        self.params.pop('self')
+        print(self.params)
+
+    def save_info(self, output_path='./',fname='Downfold.json'):
+        results = {'params': self.params}
+        with open(os.path.join(output_path, fname), 'w') as myfile:
+            json.dump(results, myfile, sort_keys=True, indent=2)
+
+
+    def downfold(self, post_func=None, 
+                       output_path='./',
+                       write_hr_nc='Downfolded_hr.nc',
+                       write_hr_txt='Downfolded_hr.txt',
+                     **params):
+        self.params.update(params)
+        if 'post_func' in self.params:
+            self.params.pop('post_func')
+        self.builder = make_builder(self.model, **self.params)
+        self.atoms = self.model.atoms
         self.ewf = self.builder.get_wannier()
         if post_func is not None:
             post_func(self.ewf)
-        self._post_downfold()
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+        try:
+            self.save_info(output_path=output_path)
+        except:
+            pass
         if write_hr_txt is not None:
-            self.ewf.save_txt(write_hr_txt)
+            self.ewf.save_txt(os.path.join(output_path, write_hr_txt))
         if write_hr_nc is not None:
-            self.ewf.write_nc(write_hr_nc, atoms=self.atoms)
+            self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc))
         return self.ewf
 
-    def _post_downfold(self):
-        pass
 
     def plot_band_fitting(self,
                           kvectors=np.array([[0, 0, 0], [0.5, 0, 0],
@@ -222,7 +220,7 @@ class BandDownfolder():
         if savefig is not None:
             plt.savefig(savefig)
         if show:
-            plt.show()  
+            plt.show()
         return ax
 
 
@@ -263,29 +261,32 @@ class SislDownfolder(BandDownfolder):
                 self.shift_fermi = self.efermi
         self.model = SislWrapper(H, spin=spin, shift_fermi=shift_fermi)
         self.atoms = self.model.atoms
+        try:
+            positions = self.model.positions
+        except Exception:
+            positions = None
+        self.model_info={'orb_names': tuple(self.model.orbs), 
+                         'positions': positions.tolist()
+            }
 
-    def _post_downfold(self, fname='Downfold.json'):
+    def save_info(self, output_path='./', fname='Downfold.json'):
         cols = self.builder.cols
-        #print(f"All orbs:{self.model.orbs}")
         self.orbs = [self.model.orbs[i] for i in cols]
-        #print(f"Selected cols: {cols}")
-        #print(f"Selected orbs: {self.orbs}")
-        #b=self.ewf.get_wann_largest_basis()
-        #print(f"largest: {b}, {self.model.orbs[b]}")
         atoms = self.model.atoms
-        with open(fname, 'w') as myfile:
-            json.dump(
-                {
-                    'selected_columns': cols.tolist(),
-                    'Orb_names': tuple(self.orbs),
-                    'Efermi': self.efermi,
-                    'chemical_symbols': atoms.get_chemical_symbols(),
-                    'atom_xred': atoms.get_scaled_positions().tolist(),
-                    'cell': atoms.get_cell().tolist()
-                },
-                myfile,
-                sort_keys=True,
-                indent=4)
+        results = {}
+        results['model_info'] = self.model_info
+        results['params'] = self.params
+        results['results'] = {
+            'selected_columns': cols.tolist(),
+            'orb_names': tuple(self.orbs),
+            'Efermi': self.efermi,
+            'chemical_symbols': atoms.get_chemical_symbols(),
+            'atom_xred': atoms.get_scaled_positions().tolist(),
+            'cell': atoms.get_cell().tolist()
+        }
+        results.update(self.params)
+        with open(os.path.join(output_path, fname), 'w') as myfile:
+            json.dump(results, myfile, sort_keys=True, indent=4)
 
     def wannier_on_grid(self, i, k=None, grid_prec=0.2, grid=None, geom=None):
         '''
@@ -324,6 +325,8 @@ class PhononDownfolder(BandDownfolder):
             self.atoms = self.model.atoms
         except Exception:
             self.atoms = None
+        self.params={}
+        
 
 
 class PhonopyDownfolder(PhononDownfolder):
