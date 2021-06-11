@@ -188,6 +188,12 @@ class LWF():
                                                      prefix + 'nwann'),
                                          zlib=True)
 
+        wann_centers = root.createVariable(prefix + 'centers',
+                                           float,
+                                           dimensions=(prefix + 'nwann',
+                                                      'three'),
+                                           zlib=True)
+
         #root.createVariable(prefix+'xred', float64, dimensions=(nR, nwann, nwann))
         #root.createVariable(prefix+'cell', float64, dimensions=(nR, nwann, nwann))
         if atoms is not None:
@@ -227,6 +233,7 @@ class LWF():
         ifc_imag[:] = np.imag(self.HwannR)
         wannR_real[:] = np.real(self.wannR)
         wannR_imag[:] = np.imag(self.wannR)
+        wann_centers[:,:] = self.wann_centers
         root.close()
 
     @staticmethod
@@ -254,6 +261,7 @@ class LWF():
         wannR_real = root.variables[prefix + 'wannier_function_real'][:]
         wannR_imag = root.variables[prefix + 'wannier_function_imag'][:]
         wannR = wannR_real + wannR_imag * 1.0j
+        wann_centers = root.variables[prefix + 'centers'][:]
         # FIXME: cell and wann_centers
         if has_atom:
             numbers = root.variables[prefix + 'atomic_numbers'][:]
@@ -266,7 +274,7 @@ class LWF():
                    ifc,
                    Rlist,
                    cell=np.eye(3),
-                   wann_centers=np.zeros((nwann, ndim)),
+                   wann_centers=wann_centers,
                    atoms=atoms)
 
     def make_supercell(self, sc_maker=None, sc_matrix=None):
