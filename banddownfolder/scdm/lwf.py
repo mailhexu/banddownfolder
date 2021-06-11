@@ -171,7 +171,7 @@ class LWF():
                                        dimensions=('nR', prefix + 'nwann',
                                                    prefix + 'nwann'),
                                        zlib=True)
-        ifc_imag = root.createVariable(prefix + 'HarmR_imag',
+        ifc_imag = root.createVariable(prefix + 'HamR_imag',
                                        float,
                                        dimensions=('nR', prefix + 'nwann',
                                                    prefix + 'nwann'),
@@ -244,10 +244,10 @@ class LWF():
             atoms = None
 
         Rlist = root.variables[prefix + 'Rlist'][:]
-        #ifc_real = root.variables[prefix + 'HamR_real'][:]
-        #ifc_imag = root.variables[prefix + 'HamR_imag'][:]
-        ifc_real = root.variables[prefix + 'ifc_real'][:]
-        ifc_imag = root.variables[prefix + 'ifc_imag'][:]
+        ifc_real = root.variables[prefix + 'HamR_real'][:]
+        ifc_imag = root.variables[prefix + 'HamR_imag'][:]
+        # ifc_real = root.variables[prefix + 'ifc_real'][:]
+        # ifc_imag = root.variables[prefix + 'ifc_imag'][:]
  
         ifc = ifc_real + ifc_imag * 1.0j
 
