@@ -5,17 +5,20 @@ from scipy.linalg import eigh, eigvalsh
 from scipy.sparse import csr_matrix
 from scipy.io import netcdf_file
 from collections import defaultdict
+#from tbmodels import Model
 from ase.io import read
 from ase.atoms import Atoms
-#from TB2J.utils import auto_assign_basis_name
 from functools import lru_cache
-from .w90_parser import parse_ham, parse_xyz
+from TB2J.utils import auto_assign_basis_name
+from TB2J.wannier import parse_ham, parse_xyz
 
 
 class AbstractTB():
-    def __init__(self, R2kfactor, nspin, norb, orb_order=1):
+    def __init__(self, R2kfactor, nspin, norb):
         #: :math:`\alpha` used in :math:`H(k)=\sum_R  H(R) \exp( \alpha k \cdot R)`,
         #: Should be :math:`2\pi i` or :math:`-2\pi i`
+        self.is_siesta = False
+        self.is_orthogonal = True
         self.R2kfactor = R2kfactor
 
         #: number of spin. 1 for collinear, 2 for spinor.
@@ -36,7 +39,6 @@ class AbstractTB():
         #: The order of the spinor basis.
         #: 1: orb1_up, orb2_up,  ... orb1_down, orb2_down,...
         #: 2: orb1_up, orb1_down, orb2_up, orb2_down,...
-        self.orb_order = orb_order
 
     def get_hamR(self, R):
         """
@@ -48,6 +50,9 @@ class AbstractTB():
         """
         returns the orbitals.
         """
+        raise NotImplementedError()
+
+    def HSE(self, kpt):
         raise NotImplementedError()
 
     def HS_and_eigen(self, kpts):
@@ -68,27 +73,18 @@ class AbstractTB():
         """
         raise NotImplementedError()
 
-    def solve_all(self, kpts):
-        evals = []
-        evecs = []
-        for ik, k in enumerate(kpts):
-            evalue, evec = self.solve(k)
-            evals.append(evalue)
-            evecs.append(evec)
-        return np.array(evals, dtype=float), np.array(evecs,
-                                                      dtype=complex,
-                                                      order='C')
-
 
 class MyTB(AbstractTB):
-    def __init__(self,
-                 nbasis,
-                 data=None,
-                 positions=None,
-                 sparse=False,
-                 ndim=3,
-                 nspin=1,
-                 double_site_energy=2.0):
+    def __init__(
+        self,
+        nbasis,
+        data=None,
+        positions=None,
+        sparse=False,
+        ndim=3,
+        nspin=1,
+        double_site_energy=2.0,
+    ):
         """
         :param nbasis: number of basis.
         :param data: a dictionary of {R: matrix}. R is a tuple, matrix is a nbasis*nbasis matrix.
@@ -97,6 +93,7 @@ class MyTB(AbstractTB):
         :param ndim: number of dimensions.
         :param nspin: number of spins.
         """
+
         if data is not None:
             self.data = data
         else:
@@ -118,6 +115,8 @@ class MyTB(AbstractTB):
         self.atoms = None
         self.R2kfactor = 2.0j * np.pi
         self.k2Rfactor = -2.0j * np.pi
+        self.is_siesta = False
+        self.is_orthogonal = True
 
     def set_atoms(self, atoms):
         self.atoms = atoms
@@ -166,8 +165,13 @@ class MyTB(AbstractTB):
         np.fill_diagonal(data[(0, 0, 0)], 0.0)
         return data
 
+
     @staticmethod
-    def read_from_wannier_dir(path, prefix, posfile='POSCAR', nls=True):
+    def read_from_wannier_dir(path,
+                              prefix,
+                              posfile='POSCAR',
+                              nls=True,
+                              groupby='spin'):
         """
         read tight binding model from a wannier function directory. 
         :param path: path
@@ -179,16 +183,55 @@ class MyTB(AbstractTB):
         nbasis, data = parse_ham(fname=os.path.join(path, prefix + '_hr.dat'))
         xcart, _, _ = parse_xyz(fname=os.path.join(path, prefix +
                                                    '_centres.xyz'))
-        #atoms = read(os.path.join(path, posfile))
-        #cell = atoms.get_cell()
-        #xred = cell.scaled_positions(xcart)
-        #ind, positions = auto_assign_basis_name(xred, atoms)
+        atoms = read(os.path.join(path, posfile))
+        cell = atoms.get_cell()
+        xred = cell.scaled_positions(xcart)
+        if groupby == 'orbital':
+            norb = nbasis // 2
+            xtmp = np.copy(xred)
+            xred[:norb] = xtmp[::2]
+            xred[norb:] = xtmp[1::2]
+            for key, val in data.items():
+                dtmp = copy.deepcopy(val)
+                data[key][:norb, :norb] = dtmp[::2, ::2]
+                data[key][:norb, norb:] = dtmp[::2, 1::2]
+                data[key][norb:, :norb] = dtmp[1::2, ::2]
+                data[key][norb:, norb:] = dtmp[1::2, 1::2]
+        ind, positions = auto_assign_basis_name(xred, atoms)
         m = MyTB(nbasis=nbasis, data=data, positions=xred)
-        #nm = m.shift_position(positions)
-        #m.set_atoms(atoms)
+        nm = m.shift_position(positions)
+        nm.set_atoms(atoms)
+        return nm
+
+    @staticmethod
+    def load_banddownfolder(path,
+                            prefix,
+                            posfile='POSCAR',
+                            nls=True,
+                            groupby='spin'):
+        from banddownfolder.scdm.lwf import LWF
+        lwf = LWF.load_nc(fname=os.path.join(path, f"{prefix}.nc"))
+        nbasis = lwf.nwann
+        nspin = 1
+        positions = lwf.wann_centers
+        ndim = lwf.ndim
+        H_mnR = defaultdict(lambda: np.zeros((nbasis, nbasis), dtype=complex))
+
+        for iR, R in enumerate(lwf.Rlist):
+            val = lwf.HwannR[iR]
+            if np.linalg.norm(R) < 0.001:
+                H_mnR[R] = val
+                H_mnR[R] -= np.diag(np.diag(val) / 2.0)
+            else:
+                H_mnR[R] = lwf.HwannR[iR]
+        m = MyTB(nbasis,
+                 data=H_mnR,
+                 nspin=nspin,
+                 ndim=ndim,
+                 positions=positions)
+        m.atoms = read(posfile)
         return m
 
-    @lru_cache(maxsize=1000)
     def gen_ham(self, k, convention=2):
         """
         generate hamiltonian matrix at k point.
@@ -221,6 +264,12 @@ class MyTB(AbstractTB):
         Hk = self.gen_ham(k, convention=convention)
         return eigh(Hk)
 
+    def HSE_k(self, kpt, convention=2):
+        H = self.gen_ham(tuple(kpt), convention=convention)
+        S = None
+        evals, evecs = eigh(H)
+        return H, S, evals, evecs
+
     def HS_and_eigen(self, kpts, convention=2):
         """
         calculate eigens for all kpoints. 
@@ -231,19 +280,20 @@ class MyTB(AbstractTB):
         evals = np.zeros((nk, self.nbasis), dtype=float)
         evecs = np.zeros((nk, self.nbasis, self.nbasis), dtype=complex)
         for ik, k in enumerate(kpts):
-            hams[ik] = self.gen_ham(tuple(k), convention=convention)
-            evals[ik], evecs[ik] = eigh(hams[ik])
+            hams[ik], S, evals[ik], evecs[ik] = self.HSE_k(
+                tuple(k), convention=convention)
         return hams, None, evals, evecs
 
     def prepare_phase_rjri(self):
         """
         The matrix P: P(i, j) = r(j)-r(i)
         """
-        self.rjminusri = np.zeros((self.nbasis, self.nbasis, self.ndim),
-                                  dtype=float)
-        for i in range(self.nbasis):
-            for j in range(self.nbasis):
-                self.rjminusri[i, j] = self.xred[j] - self.xred[i]
+        #self.rjminusri = np.zeros((self.nbasis, self.nbasis, self.ndim),
+        #                          dtype=float)
+        #for i in range(self.nbasis):
+        #    for j in range(self.nbasis):
+        #        self.rjminusri[i, j] = self.xred[j] - self.xred[i]
+        self.rjminusri = self.xred[None, :, :] - self.xred[:, None, :]
 
     def to_sparse(self):
         for key, val in self.data:
@@ -387,7 +437,8 @@ class MyTB(AbstractTB):
 
         if self.atoms is not None:
             atom_numbers[:] = np.array(self.atoms.get_atomic_numbers())
-            atom_xred[:] = np.array(self.atoms.get_scaled_positions())
+            atom_xred[:] = np.array(
+                self.atoms.get_scaled_positions(wrap=False))
             atom_cell[:] = np.array(self.atoms.get_cell())
         root.close()
 

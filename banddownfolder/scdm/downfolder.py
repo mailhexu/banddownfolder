@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+from typing import Tuple, Union, List
 import os
 import copy
 import json
@@ -12,6 +14,21 @@ from banddownfolder.wrapper.wannier90 import wannier_to_model
 from banddownfolder.wrapper.sislwrapper import SislWrapper
 from banddownfolder.wrapper.phonopywrapper import PhonopyWrapper
 from banddownfolder.wrapper.myTB import MyTB
+
+@dataclass
+class WFParams():
+    method='scdmk'
+    kmesh: Tuple[int] = (5, 5, 5)
+    nwann: int =0
+    weight_func: str ='unity'
+    mu: float =0.0
+    sigma: float =2.0
+    selected_basis: Union[None, List[int]]=None
+    anchors: Union[None, List[int]]=None
+    anchor_kpt: Tuple[int]=(0, 0, 0)
+    use_proj: bool =True
+    exclude_bands: Tuple[int]=()
+
 
 
 def make_builder(model,
@@ -29,30 +46,48 @@ def make_builder(model,
                  anchors=None):
     k = kmesh[0]
     kpts = monkhorst_pack(kmesh)
+    nk=len(kpts)
+    kweights=[1.0/nk for k in kpts]
+
     evals, evecs = model.solve_all(kpts)
+
+    anchor_kpts=[]
+    if anchors is not None:
+        for anchor in anchors:
+            anchor_kpts.append(anchor)
+    if anchor_kpt is not None:
+        anchor_kpts.append(anchor_kpt)
+    evals_anchor, evecs_anchor = model.solve_all(anchor_kpts)
+    wfn_anchor={}
+    for ik, k in enumerate(anchor_kpts):
+       wfn_anchor[tuple(k)] = evecs_anchor[ik, :, :]  
+
     try:
         positions = model.positions
     except Exception:
         positions = None
-    weight_func = occupation_func(ftype=weight_func, mu=mu, sigma=sigma)
+    if isinstance(weight_func, str):
+        weight_func = occupation_func(ftype=weight_func, mu=mu, sigma=sigma)
 
     if method == "scdmk":
         wann_builder = WannierScdmkBuilder(evals=evals,
                                            wfn=evecs,
                                            positions=positions,
                                            kpts=kpts,
+                                           kweights=kweights,
                                            nwann=nwann,
                                            weight_func=weight_func,
                                            has_phase=has_phase,
                                            Rgrid=kmesh,
                                            exclude_bands=exclude_bands,
-                                           use_proj=use_proj)
+                                           use_proj=use_proj, wfn_anchor=wfn_anchor)
         if selected_basis:
             wann_builder.set_selected_cols(selected_basis)
         elif anchors:
             wann_builder.set_anchors(anchors)
         else:
             wann_builder.auto_set_anchors(anchor_kpt)
+
     elif method == "projected":
         wann_builder = WannierProjectedBuilder(
             evals=evals,
@@ -60,10 +95,12 @@ def make_builder(model,
             has_phase=has_phase,
             positions=positions,
             kpts=kpts,
+            kweights=kweights,
             nwann=nwann,
             weight_func=weight_func,
             Rgrid=kmesh,
             exclude_bands=exclude_bands,
+            wfn_anchor=wfn_anchor
         )
         if selected_basis:
             wann_builder.set_projectors_with_basis(selected_basis)
@@ -156,7 +193,8 @@ class BandDownfolder():
         if write_hr_txt is not None:
             self.ewf.save_txt(os.path.join(output_path, write_hr_txt))
         if write_hr_nc is not None:
-            self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc))
+            #self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
+            self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
         return self.ewf
 
 
@@ -234,6 +272,7 @@ class W90Downfolder(BandDownfolder):
         self.model = m
 
 
+
 class SislDownfolder(BandDownfolder):
     def __init__(self,
                  folder=None,
@@ -268,6 +307,7 @@ class SislDownfolder(BandDownfolder):
         self.model_info={'orb_names': tuple(self.model.orbs), 
                          'positions': positions.tolist()
             }
+        self.params = {}
 
     def save_info(self, output_path='./', fname='Downfold.json'):
         cols = self.builder.cols

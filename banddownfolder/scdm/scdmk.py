@@ -25,53 +25,57 @@ class WannierBuilder():
     General Wannier function builder
     """
     def __init__(
-            self,
-            evals,
-            wfn,
-            positions,
-            kpts,
-            nwann,
-            weight_func,
-            Sk=None,
-            has_phase=True,
-            Rgrid=None,
-            exclude_bands=None,
+        self,
+        evals,
+        wfn,
+        positions,
+        kpts,
+        nwann,
+        weight_func,
+        kweights=None,
+        Sk=None,
+        has_phase=True,
+        Rgrid=None,
+        exclude_bands=None,
+        wfn_anchor=None
     ):
-        #eigen
-        self.evals = np.array(evals, dtype=float)
+        self.evals = np.array(evals)
+
+
         self.kpts = np.array(kpts, dtype=float)
-        # TODO: Remove me.modify evals
+
+        self.wfn_anchor=wfn_anchor
+
         if False:
-            shift=0.3
+            shift=1.3
             shift2=shift-0.01
             ik=self.find_k((0.5, 0, 0.5))
-            print(ik)
             self.evals[ik,0]-=shift
             self.evals[ik,1]-=shift2
             
             ik=self.find_k((0.5, 0, -0.5))
-            print(ik)
             self.evals[ik,0]-=shift
             self.evals[ik,1]-=shift2
             
     
             ik=self.find_k((-0.5, 0, -0.5))
-            print(ik)
             self.evals[ik,0]-=shift
             self.evals[ik,1]-=shift2
             
             ik=self.find_k((-0.5, 0, 0.5))
-            print(ik)
             self.evals[ik,0]-=shift
             self.evals[ik,1]-=shift2
- 
+
+
         self.ndim = self.kpts.shape[1]
         self.nkpt, self.nbasis, self.nband = np.shape(wfn)
+
+
         if Sk is None:
-            self.is_orthogonal=True
+            self.is_orthogonal = True
         else:
-            self.S=Sk
-            self.is_orthogonal=False
+            self.S = Sk
+            self.is_orthogonal = False
         # exclude bands
         if exclude_bands is None:
             exclude_bands = []
@@ -84,7 +88,10 @@ class WannierBuilder():
         self.nkpt = self.kpts.shape[0]
         self.kmesh, self.k_offset = get_monkhorst_pack_size_and_offset(
             self.kpts)
-        self.kweight = np.ones(self.nkpt, dtype=float) / self.nkpt
+        if not kweights:
+            self.kweights = np.ones(self.nkpt, dtype=float) / self.nkpt
+        else:
+            self.kweights = kweights
         self.weight_func = weight_func
 
         # Rgrid
@@ -114,7 +121,6 @@ class WannierBuilder():
         self.wannR = np.zeros((self.nR, self.nbasis, self.nwann),
                               dtype=complex)
 
-
     def get_wannier(self):
         """
         Calculate Wannier functions
@@ -136,7 +142,7 @@ class WannierBuilder():
         return the psi for the ikpt'th kpoint. excluded bands are removed.
         Note: This could be overrided so that the psi.
         """
-        return self.psi[ikpt][ :, self.ibands]
+        return self.psi[ikpt][:, self.ibands]
         #return self.psi[ikpt, :, self.ibands]  # A bug in numpy found!! The matrix get transposed.
         # Not a bug, but defined behavior (though confusing).
 
@@ -192,22 +198,23 @@ class WannierBuilder():
                                           dtype=complex)
         return self.Amn
 
-    def get_wannk_and_Hk(self):
+    def get_wannk_and_Hk(self, shift=0.0):
         """
         calculate Wannier function and H in k-space.
         """
         for ik in range(self.nkpt):
             self.wannk[ik] = self.get_psi_k(ik) @ self.Amn[ik, :, :]
             h = self.Amn[ik, :, :].T.conj() @ np.diag(
-                self.get_eval_k(ik)) @ self.Amn[ik, :, :]
+                self.get_eval_k(ik)+shift) @ self.Amn[ik, :, :]
             self.Hwann_k[ik] = h
         return self.wannk, self.Hwann_k
 
     def get_wannier_centers(self):
-        self.wann_centers=np.zeros((self.nwann, 3), dtype=float)
+        self.wann_centers = np.zeros((self.nwann, 3), dtype=float)
         for iR, R in enumerate(self.Rlist):
-            c=self.wannR[iR,:, :]
-            self.wann_centers+=(c.conj()*c).T.real@self.positions  + R[None, :]
+            c = self.wannR[iR, :, :]
+            self.wann_centers += (c.conj() *
+                                  c).T.real @ self.positions + R[None, :]
             #self.wann_centers+=np.einsum('ij, ij, jk', c.conj())#(c.conj()*c).T.real@self.positions  + R[None, :]
         print(f"Wannier Centers: {self.wann_centers}")
 
@@ -217,7 +224,8 @@ class WannierBuilder():
         # TODO: should we use overlap matrix for non-orthogonal basis?
         """
         for iwann in range(self.nwann):
-            norm=np.trace(self.wannR[:,:, iwann].conj().T@self.wannR[:, :, iwann])
+            norm = np.trace(
+                self.wannR[:, :, iwann].conj().T @ self.wannR[:, :, iwann])
             print(f"Norm {iwann}: {norm}")
 
     def k_to_R(self):
@@ -226,14 +234,18 @@ class WannierBuilder():
         """
         for iR, R in enumerate(self.Rlist):
             for ik, k in enumerate(self.kpts):
-                phase = np.exp(2j * np.pi * np.dot(R, k))
+                phase = np.exp(-2j * np.pi * np.dot(R, k))
                 self.HwannR[iR] += self.Hwann_k[
-                    ik, :, :] * phase * self.kweight[ik]
+                    ik, :, :] * phase * self.kweights[ik]
                 self.wannR[iR] += self.wannk[
-                    ik, :, :] * phase * self.kweight[ik]
+                    ik, :, :] * phase * self.kweights[ik]
         self._assure_normalized()
         self.get_wannier_centers()
-        return LWF(self.wannR, self.HwannR, self.Rlist, cell=np.eye(3), wann_centers=self.wann_centers)
+        return LWF(self.wannR,
+                   self.HwannR,
+                   self.Rlist,
+                   cell=np.eye(3),
+                   wann_centers=self.wann_centers)
 
     def save_Amnk_nc(self, fname):
         """
@@ -268,9 +280,14 @@ class WannierProjectedBuilder(WannierBuilder):
         """
         self.projectors = []
         for k, ibands in anchors.items():
-            ik = self.find_k(k)
-            for iband in ibands:
-                self.projectors.append(self.get_psi_k(ik)[:, iband])
+            if self.wfn_anchor is None:
+                ik = self.find_k(k)
+                for iband in ibands:
+                    self.projectors.append(self.get_psi_k(ik)[:, iband])
+            else:
+                for iband in ibands:
+                    print("adding anchor")
+                    self.projectors.append(self.wfn_anchor[tuple(k)][ :, iband])
         assert len(
             self.projectors
         ) == self.nwann, "The number of projectors != number of wannier functions"
@@ -320,29 +337,33 @@ class WannierScdmkBuilder(WannierBuilder):
                  kpts,
                  nwann,
                  weight_func,
+                 kweights=None,
                  Sk=None,
                  has_phase=True,
                  Rgrid=None,
                  exclude_bands=[],
                  sort_cols=True,
+                 wfn_anchor=None,
                  use_proj=True):
 
         super().__init__(evals=evals,
                          wfn=wfn,
                          positions=positions,
                          kpts=kpts,
+                         kweights=kweights,
                          nwann=nwann,
                          Sk=Sk,
                          weight_func=weight_func,
                          has_phase=has_phase,
                          Rgrid=Rgrid,
+                         wfn_anchor=wfn_anchor,
                          exclude_bands=exclude_bands)
         # anchors
         self.psi_anchors = []
         self.cols = []
         self.use_proj = use_proj
         self.projs = np.zeros((self.nkpt, self.nband), dtype=float)
-        self.sort_cols=sort_cols
+        self.sort_cols = sort_cols
 
     def set_selected_cols(self, cols):
         """
@@ -354,8 +375,7 @@ class WannierScdmkBuilder(WannierBuilder):
             ) == self.nwann, "Number of columns should be equal to number of Wannier functions"
             self.cols = cols
             if self.sort_cols:
-                self.cols=np.sort(self.cols)
-
+                self.cols = np.sort(self.cols)
 
     def add_anchors(self, psi, ianchors):
         """
@@ -378,8 +398,7 @@ class WannierScdmkBuilder(WannierBuilder):
         cols = scdm(psi_Dagger, len(ianchors))
         self.cols = np.array(tuple(set(self.cols).union(cols)))
         if self.sort_cols:
-            self.cols=np.sort(self.cols)
-        print(f"Using the anchor points, these cols are selected: {self.cols}")
+            self.cols = np.sort(self.cols)
 
     def set_anchors(self, anchors):
         """
@@ -388,23 +407,28 @@ class WannierScdmkBuilder(WannierBuilder):
         if anchors is None:
             return
         for k, ibands in anchors.items():
-            ik = self.find_k(k)
-            self.add_anchors(self.get_psi_k(ik), ibands)
+            if self.wfn_anchor is None:
+                ik = self.find_k(k)
+                self.add_anchors(self.get_psi_k(ik), ibands)
+            else:
+                self.add_anchors(self.wfn_anchor[k], ibands)
+        self.cols=self.cols[:self.nwann]
+        print(f"Using the anchor points, these cols are selected: {self.cols}")
         assert len(
             self.cols
         ) == self.nwann, "After adding all anchors, the number of selected columns != nwann"
 
-    def auto_set_anchors(self, kpt=(0.0,0.0,0.0)):
+    def auto_set_anchors(self, kpt=(0.0, 0.0, 0.0)):
         """
         Automatically find the columns using an anchor kpoint.
         kpt: the kpoint used to set as anchor points. default is Gamma (0,0,0)
         """
-        ik=self.find_k(kpt)
+        ik = self.find_k(kpt)
         psi = self.get_psi_k(ik)[:, :] * self.occ[ik][None, :]
-        psi_Dagger=psi.T.conj()
+        psi_Dagger = psi.T.conj()
         self.cols = scdm(psi_Dagger, self.nwann)
         if self.sort_cols:
-            self.cols=np.sort(self.cols)
+            self.cols = np.sort(self.cols)
         print(f"The eigenvalues at anchor k: {self.get_eval_k(ik)}")
         print(f"anchor_kpt={kpt}. Selected columns: {self.cols}.")
 
@@ -427,24 +451,8 @@ class WannierScdmkBuilder(WannierBuilder):
         """
         calculate Amn for one k point using scdmk method.
         """
-        #ik=self.find_k(kpt)
-        #psi = self.get_psi_k(ik)[:, :] * self.occ[ik][None, :]
-        #psi_Dagger=psi.T.conj()
-        #self.cols = scdm(psi_Dagger, self.nwann)
-        #if self.sort_cols:
-        #    self.cols=np.sort(self.cols)
 
-        if False:
-            psi = self.get_psi_k(ik)[:, :] * (self.occ[ik]*self.projs[ik])[None, :]
-    
-            psi_Dagger=psi.T.conj()
-            cols = scdm(psi_Dagger, self.nwann)
-            if self.sort_cols:
-                cols=np.sort(cols)
-    
         if self.use_proj:
-            #psi = self.get_psi_k(ik)[self.cols, :] @ np.diag(
-            #    self.occ[ik] * self.projs[ik])
             psi = self.get_psi_k(ik)[self.cols, :] * (self.occ[ik] *
                                                       self.projs[ik])[None, :]
         else:
@@ -466,8 +474,6 @@ class WannierScdmkBuilder(WannierBuilder):
         Amn_k = U @ VT
         return Amn_k
 
- 
-
     def prepare(self):
         """
         Calculate projection to anchors.
@@ -479,7 +485,8 @@ def occupation_func(ftype=None, mu=0.0, sigma=1.0):
     """
     Return a Weight function.
     """
-    if ftype in (None, "unity"):
+    print(ftype)
+    if ftype in [None, "unity"]:
 
         def func(x):
             return np.ones_like(x, dtype=float)
@@ -495,6 +502,9 @@ def occupation_func(ftype=None, mu=0.0, sigma=1.0):
 
         def func(x):
             return 0.5 * erfc((x - mu) / 0.01) - 0.5 * erfc((x - sigma) / 0.01)
+    elif ftype == 'linear':
+        def func(x):
+            return x
     else:
         raise NotImplementedError("function type %s not implemented." % ftype)
     return func
@@ -512,15 +522,15 @@ def Amnk_to_Hk(Amn, psi, Hk0, kpts):
     return np.array(Hk_prim)
 
 
-def Hk_to_Hreal(Hk, kpts, kweight, Rpts):
+def Hk_to_Hreal(Hk, kpts, kweights, Rpts):
     nbasis = Hk.shape[1]
     nk = len(kpts)
     nR = len(Rpts)
     for iR, R in enumerate(Rpts):
         HR = np.zeros((nR, nbasis, nbasis), dtype=complex)
         for ik, k in enumerate(kpts):
-            phase = np.exp(2j * np.pi * np.dot(R, k))
-            HR[iR] += Hk[ik] * phase * kweight[ik]
+            phase = np.exp(-2j * np.pi * np.dot(R, k))
+            HR[iR] += Hk[ik] * phase * kweights[ik]
     return HR
 
 

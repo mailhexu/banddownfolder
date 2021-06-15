@@ -5,6 +5,9 @@
 
 *.swp
 
+paper/
+refs/
+
 # Latex 
 *.aux
 main.pdf

@@ -8,7 +8,7 @@ from ase import Atoms
 
 class LWF():
     """
-    Lattice Wannier function
+    Localized Wannier function
     """
     def __init__(self, wannR, HwannR, Rlist, cell, wann_centers, atoms=None):
         self.atoms = atoms
@@ -44,7 +44,6 @@ class LWF():
         for iR, R in enumerate(self.Rlist):
             phase = np.exp(2j * np.pi * np.dot(R, k))
             hk += self.HwannR[iR, :, :] * phase
-        #hk = (hk + hk.T.conj()) / 2
         return hk
 
     def solve_wann_k(self, k, ham=False):
@@ -83,7 +82,7 @@ class LWF():
             natom = root.createDimension(prefix + 'natom', len(atoms))
 
         Rlist = root.createVariable(prefix + 'Rlist',
-                                    float,
+                                    int,
                                     dimensions=('nR', 'ndim'))
         HamR_real = root.createVariable(prefix + 'HamR_real',
                                        float,
@@ -106,9 +105,12 @@ class LWF():
                                          dimensions=('nR', prefix + 'nbasis',
                                                      prefix + 'nwann'),
                                          zlib=True)
+        wann_center_xred =root.createVariable(prefix + 'wannier_center_xred',
+                                         float,
+                                         dimensions=(
+                                                     prefix + 'nwann', 'three'),
+                                         zlib=True)
 
-        #root.createVariable(prefix+'xred', float64, dimensions=(nR, nwann, nwann))
-        #root.createVariable(prefix+'cell', float64, dimensions=(nR, nwann, nwann))
         if atoms is not None:
             cell = root.createVariable(prefix + "cell",
                                        float,
@@ -136,14 +138,22 @@ class LWF():
 
             cell[:] = atoms.get_cell().array
             numbers[:] = atoms.get_atomic_numbers()
-            xred[:] = atoms.get_scaled_positions()
+            xred[:] = atoms.get_scaled_positions(wrap=False)
             xcart[:] = atoms.get_positions()
+            masses[:] = atoms.get_masses()
+            try:
+               lwf_masses[:] = np.real(self.masses_to_lwf_masses(masses))
+            except:
+                pass
+
+            
 
         Rlist[:] = np.array(self.Rlist)
         HamR_real[:] = np.real(self.HwannR)
         HamR_imag[:] = np.imag(self.HwannR)
         wannR_real[:] = np.real(self.wannR)
         wannR_imag[:] = np.imag(self.wannR)
+        wann_center_xred[:] = np.array(self.wann_centers)
         root.close()
 
 
@@ -152,82 +162,6 @@ class LWF():
         m3 = np.kron(masses, [1, 1, 1])
         return np.einsum('rij,i->j', (self.wannR.conj()*self.wannR), m3)
 
-    def write_lwf_nc(self, fname, prefix='wann_', atoms=None):
-        root = Dataset(fname, 'w')
-        ndim = root.createDimension('ndim', self.ndim)
-        nR = root.createDimension('nR', self.nR)
-        three = root.createDimension('three', 3)
-        nwann = root.createDimension(prefix + 'nwann', self.nwann)
-        nbasis = root.createDimension(prefix + 'nbasis', self.nbasis)
-
-        if atoms is not None:
-            natom = root.createDimension(prefix + 'natom', len(atoms))
-
-        Rlist = root.createVariable(prefix + 'Rlist',
-                                    float,
-                                    dimensions=('nR', 'ndim'))
-        ifc_real = root.createVariable(prefix + 'HamR_real',
-                                       float,
-                                       dimensions=('nR', prefix + 'nwann',
-                                                   prefix + 'nwann'),
-                                       zlib=True)
-        ifc_imag = root.createVariable(prefix + 'HarmR_imag',
-                                       float,
-                                       dimensions=('nR', prefix + 'nwann',
-                                                   prefix + 'nwann'),
-                                       zlib=True)
-
-        wannR_real = root.createVariable(prefix + 'wannier_function_real',
-                                         float,
-                                         dimensions=('nR', prefix + 'nbasis',
-                                                     prefix + 'nwann'),
-                                         zlib=True)
-        wannR_imag = root.createVariable(prefix + 'wannier_function_imag',
-                                         float,
-                                         dimensions=('nR', prefix + 'nbasis',
-                                                     prefix + 'nwann'),
-                                         zlib=True)
-
-        #root.createVariable(prefix+'xred', float64, dimensions=(nR, nwann, nwann))
-        #root.createVariable(prefix+'cell', float64, dimensions=(nR, nwann, nwann))
-        if atoms is not None:
-            cell = root.createVariable(prefix + "cell",
-                                       float,
-                                       dimensions=('three', 'three'),
-                                       zlib=True)
-            numbers = root.createVariable(prefix + "atomic_numbers",
-                                          int,
-                                          dimensions=(prefix + 'natom'),
-                                          zlib=True)
-            masses = root.createVariable(prefix + "atomic_masses",
-                                         float,
-                                         dimensions=(prefix + 'natom'),
-                                         zlib=True)
-
-            xred = root.createVariable(prefix + "atomic_xred",
-                                       float,
-                                       dimensions=(prefix + "natom", "three"))
-
-            xcart = root.createVariable(prefix + "atomic_xcart",
-                                        float,
-                                        dimensions=(prefix + "natom", "three"))
-            lwf_masses = root.createVariable(prefix + 'lwf_masses',
-                                             float,
-                                             dimensions=(prefix + 'nwann'))
-
-            cell[:] = atoms.get_cell().array
-            numbers[:] = atoms.get_atomic_numbers()
-            xred[:] = atoms.get_scaled_positions()
-            xcart[:] = atoms.get_positions()
-            masses[:] = atoms.get_masses()
-            lwf_masses[:] = np.real(self.masses_to_lwf_masses(masses))
-
-        Rlist[:] = np.array(self.Rlist)
-        ifc_real[:] = np.real(self.HwannR)
-        ifc_imag[:] = np.imag(self.HwannR)
-        wannR_real[:] = np.real(self.wannR)
-        wannR_imag[:] = np.imag(self.wannR)
-        root.close()
 
     @staticmethod
     def load_nc(fname, prefix='wann_'):
@@ -244,12 +178,14 @@ class LWF():
             atoms = None
 
         Rlist = root.variables[prefix + 'Rlist'][:]
-        #ifc_real = root.variables[prefix + 'HamR_real'][:]
-        #ifc_imag = root.variables[prefix + 'HamR_imag'][:]
-        ifc_real = root.variables[prefix + 'ifc_real'][:]
-        ifc_imag = root.variables[prefix + 'ifc_imag'][:]
+        Rlist = np.array(Rlist, dtype=int)
+        Ham_real = root.variables[prefix + 'ifc_real'][:]
+        try:
+            Ham_imag = root.variables[prefix + 'ifc_imag'][:]
+        except:
+            Ham_imag = root.variables[prefix + 'HarmR_imag'][:]
  
-        ifc = ifc_real + ifc_imag * 1.0j
+        Ham = Ham_real + Ham_imag * 1.0j
 
         wannR_real = root.variables[prefix + 'wannier_function_real'][:]
         wannR_imag = root.variables[prefix + 'wannier_function_imag'][:]
@@ -257,16 +193,23 @@ class LWF():
         # FIXME: cell and wann_centers
         if has_atom:
             numbers = root.variables[prefix + 'atomic_numbers'][:]
+            #xcart = root.variables[prefix + 'atomic_xcart'][:]
             xcart = root.variables[prefix + 'xcart'][:]
             cell = root.variables[prefix + 'cell'][:]
             atoms = Atoms(numbers, cell=cell, positions=xcart)
         else:
             atoms = None
+        
+        try:
+            wann_centers= root.variables[prefix+'wannier_center_xred'][:]
+        except:
+            print(f"Warning: wannier centers {prefix+'wannier_center_xred'} not found, using 0 instead.")
+            wann_centers=np.zeros((nwann, ndim))
         return LWF(wannR,
-                   ifc,
+                   Ham,
                    Rlist,
                    cell=np.eye(3),
-                   wann_centers=np.zeros((nwann, ndim)),
+                   wann_centers=wann_centers,
                    atoms=atoms)
 
     def make_supercell(self, sc_maker=None, sc_matrix=None):
