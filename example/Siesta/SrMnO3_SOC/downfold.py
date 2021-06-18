@@ -34,4 +34,5 @@ def main():
         savefig='Downfolded_band.png',
         show=True)
 
-main()
+if __name__=="__main__":
+    main()
