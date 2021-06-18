@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='banddownfolder',
-    version='0.1.1',
+    version='0.1.2',
     description='Downfold Hamiltonian',
     author='Xu He',
     author_email='mailhexu@gmail.com',
