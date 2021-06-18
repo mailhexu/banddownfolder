@@ -216,7 +216,7 @@ class WannierBuilder():
             self.wann_centers += (c.conj() *
                                   c).T.real @ self.positions + R[None, :]
             #self.wann_centers+=np.einsum('ij, ij, jk', c.conj())#(c.conj()*c).T.real@self.positions  + R[None, :]
-        print(f"Wannier Centers: {self.wann_centers}")
+        #print(f"Wannier Centers: {self.wann_centers}")
 
     def _assure_normalized(self):
         """
@@ -226,7 +226,7 @@ class WannierBuilder():
         for iwann in range(self.nwann):
             norm = np.trace(
                 self.wannR[:, :, iwann].conj().T @ self.wannR[:, :, iwann])
-            print(f"Norm {iwann}: {norm}")
+            #print(f"Norm {iwann}: {norm}")
 
     def k_to_R(self):
         """
@@ -286,7 +286,7 @@ class WannierProjectedBuilder(WannierBuilder):
                     self.projectors.append(self.get_psi_k(ik)[:, iband])
             else:
                 for iband in ibands:
-                    print("adding anchor")
+                    #print("adding anchor")
                     self.projectors.append(self.wfn_anchor[tuple(k)][ :, iband])
         assert len(
             self.projectors
@@ -485,7 +485,6 @@ def occupation_func(ftype=None, mu=0.0, sigma=1.0):
     """
     Return a Weight function.
     """
-    print(ftype)
     if ftype in [None, "unity"]:
 
         def func(x):

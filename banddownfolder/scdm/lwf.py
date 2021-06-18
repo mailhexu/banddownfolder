@@ -304,7 +304,7 @@ class LWF():
             sc_maker = SupercellMaker(sc_matrix)
         if self.atoms is not None:
             sc_atoms = sc_maker.sc_atoms(self.atoms)
-        print(self.HwannR.shape)
+        #print(self.HwannR.shape)
         sc_Rlist, sc_HR = sc_maker.sc_Rlist_HR(self.Rlist,
                                                self.HwannR,
                                                n_basis=self.nwann)
