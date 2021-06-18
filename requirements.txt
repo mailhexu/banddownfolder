@@ -4,6 +4,6 @@ matplotlib
 ase>=3.19
 phonopy
 netcdf4
-sisl
+sisl>=0.10
 
 
