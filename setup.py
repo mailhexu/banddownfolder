@@ -10,9 +10,8 @@ setup(
     license='GPLv3',
     packages=find_packages(),
     package_data={},
-    install_requires=['numpy', 'scipy',  'matplotlib', 'ase', 'numba', 
-        'netcdf4',
-        'jupyter',
+    install_requires=['numpy', 'scipy',  'matplotlib', 'ase'
+        'netcdf4', 'sisl'
         ],
     scripts=['scripts/phonopy_to_netcdf.py'
         ],

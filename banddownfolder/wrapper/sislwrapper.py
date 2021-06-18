@@ -50,7 +50,7 @@ class SislWrapper():
                 for ia, a in enumerate(_atoms):
                     symnum=sdict[ia]
                     orb_names=[]
-                    for x in a.orbital:
+                    for x in a.orbitals:
                         name=f"{symnum}|{x.name()}|{spin}"
                         orb_names.append(name)
                         self.positions.append(xred[ia])

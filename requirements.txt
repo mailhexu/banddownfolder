@@ -2,8 +2,7 @@ numpy>1.16.5
 scipy
 matplotlib
 ase
-numba
 netcdf4
-#jupyter
+sisl
 
 

@@ -8,8 +8,8 @@ class GPAWWrapper():
     def get_Ham_and_S(self):
         pass
 
-from gpaw import restart
-from gpaw.lcao.tools import get_bfi
+#from gpaw import restart
+#from gpaw.lcao.tools import get_bfi
 
 def test():
     atoms, calc=restart('/home/hexu/projects/jiahui/STO_bulk_LCAO/STO3_gs.gpw', fixdensity=True )
@@ -18,4 +18,5 @@ def test():
     desc=calc.setups[0].basis.get_description()
 
 
-test()
+if __name__=="__main__":
+    test()

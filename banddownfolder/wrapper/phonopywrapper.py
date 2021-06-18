@@ -5,7 +5,7 @@ from phonopy import load, Phonopy
 from ase import Atoms
 from ase.dft.kpoints import monkhorst_pack
 from banddownfolder.utils.kpoints import kmesh_to_R, build_Rgrid
-from minimulti.ioput.ifc_netcdf import save_ifc_to_netcdf
+#from minimulti.ioput.ifc_netcdf import save_ifc_to_netcdf
 from banddownfolder.plot import plot_band
 from banddownfolder.wrapper.ifcwrapper import IFC
 import matplotlib.pyplot as plt
@@ -67,8 +67,8 @@ class PhonopyWrapper():
             if eval_modify_function is not None:
                 evals, evecs = eigh(Hk)
                 sumne = np.sum(evals[evals < 0])
-                if sumne < -1e-18:
-                    print(k, sumne)
+                #if sumne < -1e-18:
+                #    print(k, sumne)
                 evals = eval_modify_function(evals)
                 Hk = evecs.conj() @ np.diag(evals) @ evecs.T
             for iR, R in enumerate(Rpts):
@@ -79,15 +79,15 @@ class PhonopyWrapper():
             HR = self.assure_ASR(HR, Rpts)
         return Rpts, HR
 
-    def save_ifc(self,
-                 fname,
-                 kmesh,
-                 eval_modify_function=None,
-                 assure_ASR=False):
-        Rpts, HR = self.get_ifc(kmesh,
-                                eval_modify_function=eval_modify_function,
-                                assure_ASR=assure_ASR)
-        save_ifc_to_netcdf(fname, HR, Rpts, self.atoms)
+    #def save_ifc(self,
+    #             fname,
+    #             kmesh,
+    #             eval_modify_function=None,
+    #             assure_ASR=False):
+    #    Rpts, HR = self.get_ifc(kmesh,
+    #                            eval_modify_function=eval_modify_function,
+    #                            assure_ASR=assure_ASR)
+    #    save_ifc_to_netcdf(fname, HR, Rpts, self.atoms)
 
     def solve_all(self, kpts):
         evals = []
@@ -115,7 +115,6 @@ class PhonopyWrapper():
         scatoms=Atoms(numbers=supercell.get_atomic_numbers(),cell=supercell.get_cell(), positions=supercell.get_positions())
         datoms=copy.deepcopy(scatoms)
         disp=sum(modulations)
-        print(f"{disp=}")
         datoms.set_positions(datoms.get_positions() +  disp)
         return scatoms, datoms
 
@@ -133,15 +132,15 @@ class PhonopyWrapper():
             kpt, index, amp, phase, modulation_func = mode
             _, evec = self.solve(kpt)
             R = scmaker.Rvector_for_each_element(n_ind=self.natom * 3)
-            print(evec[index].reshape((self.natom, 3)))
+            #print(evec[index].reshape((self.natom, 3)))
             disp = scmaker.sc_trans_kvector(
                 evec[index], kpt=kpt, phase=phase, real=True) * amp
             p = np.exp(2j * np.pi * np.einsum('ij, j->i', self.atoms.get_scaled_positions(), kpt))
             p = np.kron(np.ones(scmaker.ncell), np.kron([1,1,1], p))
-            print(p.shape)
-            print(disp.shape)
+            #print(p.shape)
+            #print(disp.shape)
             disp *= p.real
-            print(f"{disp=}")
+            #print(f"{disp=}")
             if modulation_func is None:
                 pass
             else:
@@ -149,7 +148,6 @@ class PhonopyWrapper():
 
             d+=disp
         d=d.reshape((self.natom * scmaker.ncell, 3))
-        print(d)
         positions += d
         distorted_atoms.set_positions(positions)
         return sc_atoms, distorted_atoms
