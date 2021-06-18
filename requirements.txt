@@ -2,6 +2,7 @@ numpy>1.16.5
 scipy
 matplotlib
 ase>=3.19
+phonopy
 netcdf4
 sisl
 
