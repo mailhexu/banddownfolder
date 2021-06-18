@@ -9,7 +9,8 @@ from banddownfolder.utils.kpoints import kmesh_to_R, build_Rgrid
 from banddownfolder.plot import plot_band
 from banddownfolder.wrapper.ifcwrapper import IFC
 import matplotlib.pyplot as plt
-from supercellmap import SupercellMaker
+#from supercellmap import SupercellMaker
+from banddownfolder.utils.supercell import SupercellMaker
 
 
 class PhonopyWrapper():
