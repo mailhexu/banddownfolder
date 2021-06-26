@@ -295,7 +295,10 @@ class SislDownfolder(BandDownfolder):
             fdf = sisl.get_sile(os.path.join(folder, fdf_file))
             fdf.read()
             H = fdf.read_hamiltonian()
-            self.efermi = fdf.read_fermi_level().data[0]
+            try:
+                self.efermi = fdf.read_fermi_level().data[0]
+            except:
+                self.efermi = fdf.read_fermi_level()
             if recover_fermi:
                 self.shift_fermi = self.efermi
         self.model = SislWrapper(H, spin=spin, shift_fermi=shift_fermi)
