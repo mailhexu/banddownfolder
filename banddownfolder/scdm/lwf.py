@@ -320,6 +320,7 @@ class LWF():
             #myfile.write(f"Cell parameter: {self.cell}\n")
             myfile.write(f"Hamiltonian:  \n" + "=" * 60 + '\n')
             for iR, R in enumerate(self.Rlist):
+                print(self.Rlist)
                 myfile.write(f"index of R: {iR}.  R = {R}\n")
                 d = self.HwannR[iR]
                 for i in range(self.nwann):
