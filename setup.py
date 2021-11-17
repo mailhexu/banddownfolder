@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='banddownfolder',
-    version='0.1.3',
+    version='0.1.4',
     description='Downfold Hamiltonian',
     author='Xu He',
     author_email='mailhexu@gmail.com',
@@ -11,10 +11,10 @@ setup(
     packages=find_packages(),
     package_data={},
     install_requires=['numpy>=1.20', 'scipy',  'matplotlib', 'ase>=3.19'
-        'netcdf4', 'sisl>=0.10', 'phonopy'
-        ],
+                      'netcdf4', 'sisl>=0.10', 'phonopy'
+                      ],
     scripts=['scripts/phonopy_to_netcdf.py'
-        ],
+             ],
     classifiers=[
         'Development Status :: 3 - Alpha',
     ])

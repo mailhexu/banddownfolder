@@ -105,7 +105,6 @@ class SpinDensityMatricesDownfolder(WannierBuilder):
 
         if nwann is None:
             nwann = model_up.nbasis
-        print(f"{rho.shape=}")
         return SpinDensityMatricesDownfolder(evals=evals,
                                              density_matrices=rho,
                                              positions=positions,
@@ -125,8 +124,6 @@ class SpinDensityMatricesDownfolder(WannierBuilder):
         """
         ik = self.find_k(kpt)
         density = np.real(np.diag(np.sum(self.spin_dm, axis=0))) / self.nkpt
-        print(density)
-        print(sum(density))
         self.cols = scdm(self.spin_dm[ik], self.nwann)
         print(f"anchor_kpt={kpt}. Selected columns: {self.cols}.")
         if self.sort_cols:
@@ -139,9 +136,9 @@ class SpinDensityMatricesDownfolder(WannierBuilder):
         """
         calculate Wannier function and H in k-space.
         """
-        spin_dm=np.average(self.spin_dm[:, :], axis=0)
+        spin_dm = np.average(self.spin_dm[:, :], axis=0)
 
-        spin_dmc =  spin_dm[:, self.cols]
+        spin_dmc = spin_dm[:, self.cols]
         for ik in range(self.nkpt):
             self.wannk[ik] = self.spin_dm[ik][:, self.cols]
             ##self.wannk[ik] = spin_dm
@@ -149,16 +146,16 @@ class SpinDensityMatricesDownfolder(WannierBuilder):
 
             U, E, VT = np.linalg.svd(spin_dmc, full_matrices=False)
             #self.wannk[ik] = U[:,:self.nwann] @  VT[:self.nwann, :self.nwann]
-            
+
             U, E, VT = np.linalg.svd(self.wannk[ik], full_matrices=False)
-            self.wannk[ik]=U@VT
+            self.wannk[ik] = U@VT
             #self.wannk[ik], _ = qr(self.wannk[ik], mode='economic')
-            #h = self.Amn[ik, :, :].T.conj() @ np.diag(
+            # h = self.Amn[ik, :, :].T.conj() @ np.diag(
             #    self.get_eval_k(ik)) @ self.Amn[ik, :, :]
             #self.wannk[ik] = np.eye(self.nbasis)
-            #self.wannk[ik] = self.wannk[ik] / np.linalg.norm(self.wannk[ik],
+            # self.wannk[ik] = self.wannk[ik] / np.linalg.norm(self.wannk[ik],
             #                                                 axis=0)[None, :]
-            #self.wannk[ik]=np.linalg.eig(self.wannk[ik])[1]
+            # self.wannk[ik]=np.linalg.eig(self.wannk[ik])[1]
 
             #print(np.real(self.wannk[ik].T.conj() @ self.wannk[ik]))
             #print(np.imag(self.wannk[ik].T.conj() @ self.wannk[ik]))
@@ -180,7 +177,7 @@ class SpinDensityMatricesDownfolder(WannierBuilder):
                 for ispin in [0, 1]:
                     self.HwannR[ispin, iR] += self.Hwann_k[
                         ispin, ik, :, :] * phase * self.kweight[ik]
-            if np.linalg.norm(R)<0.01:
+            if np.linalg.norm(R) < 0.01:
                 print(self.wannR[iR])
         self.get_wannier_centers()
         self.lwf_up = LWF(self.wannR,
@@ -210,7 +207,7 @@ class SpinDensityMatricesDownfolder(WannierBuilder):
         ax = plot_band(self.lwf_up)
 
         ax = plot_band(self.lwf_down, color='red')
-        #plt.show()
+        # plt.show()
 
     def get_wannier():
         pass

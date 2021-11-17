@@ -24,6 +24,7 @@ class WannierBuilder():
     """
     General Wannier function builder
     """
+
     def __init__(
         self,
         evals,
@@ -41,35 +42,31 @@ class WannierBuilder():
     ):
         self.evals = np.array(evals)
 
-
         self.kpts = np.array(kpts, dtype=float)
 
-        self.wfn_anchor=wfn_anchor
+        self.wfn_anchor = wfn_anchor
 
         if False:
-            shift=1.3
-            shift2=shift-0.01
-            ik=self.find_k((0.5, 0, 0.5))
-            self.evals[ik,0]-=shift
-            self.evals[ik,1]-=shift2
-            
-            ik=self.find_k((0.5, 0, -0.5))
-            self.evals[ik,0]-=shift
-            self.evals[ik,1]-=shift2
-            
-    
-            ik=self.find_k((-0.5, 0, -0.5))
-            self.evals[ik,0]-=shift
-            self.evals[ik,1]-=shift2
-            
-            ik=self.find_k((-0.5, 0, 0.5))
-            self.evals[ik,0]-=shift
-            self.evals[ik,1]-=shift2
+            shift = 1.3
+            shift2 = shift-0.01
+            ik = self.find_k((0.5, 0, 0.5))
+            self.evals[ik, 0] -= shift
+            self.evals[ik, 1] -= shift2
 
+            ik = self.find_k((0.5, 0, -0.5))
+            self.evals[ik, 0] -= shift
+            self.evals[ik, 1] -= shift2
+
+            ik = self.find_k((-0.5, 0, -0.5))
+            self.evals[ik, 0] -= shift
+            self.evals[ik, 1] -= shift2
+
+            ik = self.find_k((-0.5, 0, 0.5))
+            self.evals[ik, 0] -= shift
+            self.evals[ik, 1] -= shift2
 
         self.ndim = self.kpts.shape[1]
         self.nkpt, self.nbasis, self.nband = np.shape(wfn)
-
 
         if Sk is None:
             self.is_orthogonal = True
@@ -143,7 +140,7 @@ class WannierBuilder():
         Note: This could be overrided so that the psi.
         """
         return self.psi[ikpt][:, self.ibands]
-        #return self.psi[ikpt, :, self.ibands]  # A bug in numpy found!! The matrix get transposed.
+        # return self.psi[ikpt, :, self.ibands]  # A bug in numpy found!! The matrix get transposed.
         # Not a bug, but defined behavior (though confusing).
 
     def get_eval_k(self, ikpt):
@@ -154,7 +151,7 @@ class WannierBuilder():
 
     def _remove_phase_k(self, wfnk, k):
         #phase = np.exp(-2j * np.pi * np.einsum('j, kj->k', k, self.positions))
-        #return wfnk[:, :] * phase[:, None]
+        # return wfnk[:, :] * phase[:, None]
         psi = np.zeros_like(wfnk)
         for ibasis in range(self.nbasis):
             phase = np.exp(-2j * np.pi * np.dot(k, self.positions[ibasis, :]))
@@ -215,7 +212,7 @@ class WannierBuilder():
             c = self.wannR[iR, :, :]
             self.wann_centers += (c.conj() *
                                   c).T.real @ self.positions + R[None, :]
-            #self.wann_centers+=np.einsum('ij, ij, jk', c.conj())#(c.conj()*c).T.real@self.positions  + R[None, :]
+            # self.wann_centers+=np.einsum('ij, ij, jk', c.conj())#(c.conj()*c).T.real@self.positions  + R[None, :]
         #print(f"Wannier Centers: {self.wann_centers}")
 
     def _assure_normalized(self):
@@ -273,6 +270,7 @@ class WannierProjectedBuilder(WannierBuilder):
     We define a set of projectors, which is a nwann*nbasis matrix.
     Each projector is vector of size nbasis.
     """
+
     def set_projectors_with_anchors(self, anchors):
         """
         Use one eigen vector (defined as anchor point) as projector.
@@ -287,7 +285,7 @@ class WannierProjectedBuilder(WannierBuilder):
             else:
                 for iband in ibands:
                     #print("adding anchor")
-                    self.projectors.append(self.wfn_anchor[tuple(k)][ :, iband])
+                    self.projectors.append(self.wfn_anchor[tuple(k)][:, iband])
         assert len(
             self.projectors
         ) == self.nwann, "The number of projectors != number of wannier functions"
@@ -330,6 +328,7 @@ class WannierScdmkBuilder(WannierBuilder):
     """
     Build Wannier functions using the SCDMk method.
     """
+
     def __init__(self,
                  evals,
                  wfn,
@@ -393,7 +392,7 @@ class WannierScdmkBuilder(WannierBuilder):
                 proj[iband] += np.abs(np.vdot(psi[:, iband], psi[:, ia]))
         psi_D = psi @ np.diag(proj)
 
-        psi_Dagger = psi_D.T.conj()  #psi.T.conj()
+        psi_Dagger = psi_D.T.conj()  # psi.T.conj()
 
         cols = scdm(psi_Dagger, len(ianchors))
         self.cols = np.array(tuple(set(self.cols).union(cols)))
@@ -412,7 +411,7 @@ class WannierScdmkBuilder(WannierBuilder):
                 self.add_anchors(self.get_psi_k(ik), ibands)
             else:
                 self.add_anchors(self.wfn_anchor[k], ibands)
-        self.cols=self.cols[:self.nwann]
+        self.cols = self.cols[:self.nwann]
         print(f"Using the anchor points, these cols are selected: {self.cols}")
         assert len(
             self.cols
@@ -540,4 +539,4 @@ def test():
     plt.show()
 
 
-#print(kmesh_to_R([2,2,2]))
+# print(kmesh_to_R([2,2,2]))

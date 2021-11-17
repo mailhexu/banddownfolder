@@ -15,20 +15,20 @@ from banddownfolder.wrapper.sislwrapper import SislWrapper
 from banddownfolder.wrapper.phonopywrapper import PhonopyWrapper
 from banddownfolder.wrapper.myTB import MyTB
 
+
 @dataclass
 class WFParams():
-    method='scdmk'
+    method = 'scdmk'
     kmesh: Tuple[int] = (5, 5, 5)
-    nwann: int =0
-    weight_func: str ='unity'
-    mu: float =0.0
-    sigma: float =2.0
-    selected_basis: Union[None, List[int]]=None
-    anchors: Union[None, List[int]]=None
-    anchor_kpt: Tuple[int]=(0, 0, 0)
-    use_proj: bool =True
-    exclude_bands: Tuple[int]=()
-
+    nwann: int = 0
+    weight_func: str = 'unity'
+    mu: float = 0.0
+    sigma: float = 2.0
+    selected_basis: Union[None, List[int]] = None
+    anchors: Union[None, List[int]] = None
+    anchor_kpt: Tuple[int] = (0, 0, 0)
+    use_proj: bool = True
+    exclude_bands: Tuple[int] = ()
 
 
 def make_builder(model,
@@ -46,21 +46,21 @@ def make_builder(model,
                  anchors=None):
     k = kmesh[0]
     kpts = monkhorst_pack(kmesh)
-    nk=len(kpts)
-    kweights=[1.0/nk for k in kpts]
+    nk = len(kpts)
+    kweights = [1.0/nk for k in kpts]
 
     evals, evecs = model.solve_all(kpts)
 
-    anchor_kpts=[]
+    anchor_kpts = []
     if anchors is not None:
         for anchor in anchors:
             anchor_kpts.append(anchor)
     if anchor_kpt is not None:
         anchor_kpts.append(anchor_kpt)
     evals_anchor, evecs_anchor = model.solve_all(anchor_kpts)
-    wfn_anchor={}
+    wfn_anchor = {}
     for ik, k in enumerate(anchor_kpts):
-       wfn_anchor[tuple(k)] = evecs_anchor[ik, :, :]  
+        wfn_anchor[tuple(k)] = evecs_anchor[ik, :, :]
 
     try:
         positions = model.positions
@@ -132,7 +132,7 @@ class BandDownfolder():
                        use_proj=True,
                        exclude_bands=[],
                        post_func=None,
-        ):
+                       ):
         """
         Downfold the Band structure.
         The method first get the eigenvalues and eigenvectors in a Monkhorst-Pack grid from the model.
@@ -165,17 +165,16 @@ class BandDownfolder():
         self.params.pop('self')
         print(self.params)
 
-    def save_info(self, output_path='./',fname='Downfold.json'):
+    def save_info(self, output_path='./', fname='Downfold.json'):
         results = {'params': self.params}
         with open(os.path.join(output_path, fname), 'w') as myfile:
             json.dump(results, myfile, sort_keys=True, indent=2)
 
-
-    def downfold(self, post_func=None, 
-                       output_path='./',
-                       write_hr_nc='Downfolded_hr.nc',
-                       write_hr_txt='Downfolded_hr.txt',
-                     **params):
+    def downfold(self, post_func=None,
+                 output_path='./',
+                 write_hr_nc='Downfolded_hr.nc',
+                 write_hr_txt='Downfolded_hr.txt',
+                 **params):
         self.params.update(params)
         if 'post_func' in self.params:
             self.params.pop('post_func')
@@ -194,9 +193,9 @@ class BandDownfolder():
             self.ewf.save_txt(os.path.join(output_path, write_hr_txt))
         if write_hr_nc is not None:
             #self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
-            self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
+            self.ewf.write_nc(os.path.join(
+                output_path, write_hr_nc), atoms=self.atoms)
         return self.ewf
-
 
     def plot_band_fitting(self,
                           kvectors=np.array([[0, 0, 0], [0.5, 0, 0],
@@ -272,7 +271,6 @@ class W90Downfolder(BandDownfolder):
         self.model = m
 
 
-
 class SislDownfolder(BandDownfolder):
     def __init__(self,
                  folder=None,
@@ -307,9 +305,9 @@ class SislDownfolder(BandDownfolder):
             positions = self.model.positions
         except Exception:
             positions = None
-        self.model_info={'orb_names': tuple(self.model.orbs), 
-                         'positions': positions.tolist()
-            }
+        self.model_info = {'orb_names': tuple(self.model.orbs),
+                           'positions': positions.tolist()
+                           }
         self.params = {}
 
     def save_info(self, output_path='./', fname='Downfold.json'):
@@ -350,9 +348,9 @@ class SislDownfolder(BandDownfolder):
         # Get the coefficients of that we want
         #coeffs = all_coeffs.sel(wannier=i)
         coeffi = wannR[:, :, i]
-        #if k is None:
+        # if k is None:
         #    coeffs = coeffs.mean('k')
-        #else:
+        # else:
         #    coeffs = coeffs.sel(k=k)
 
         # Project the orbitals with the coefficients on the grid
@@ -368,8 +366,7 @@ class PhononDownfolder(BandDownfolder):
             self.atoms = self.model.atoms
         except Exception:
             self.atoms = None
-        self.params={}
-        
+        self.params = {}
 
 
 class PhonopyDownfolder(PhononDownfolder):

@@ -5,7 +5,7 @@ from phonopy import load, Phonopy
 from ase import Atoms
 from ase.dft.kpoints import monkhorst_pack
 from banddownfolder.utils.kpoints import kmesh_to_R, build_Rgrid
-#from minimulti.ioput.ifc_netcdf import save_ifc_to_netcdf
+from minimulti.ioput.ifc_netcdf import save_ifc_to_netcdf
 from banddownfolder.plot import plot_band
 from banddownfolder.wrapper.ifcwrapper import IFC
 import matplotlib.pyplot as plt
@@ -68,7 +68,7 @@ class PhonopyWrapper():
             if eval_modify_function is not None:
                 evals, evecs = eigh(Hk)
                 sumne = np.sum(evals[evals < 0])
-                #if sumne < -1e-18:
+                # if sumne < -1e-18:
                 #    print(k, sumne)
                 evals = eval_modify_function(evals)
                 Hk = evecs.conj() @ np.diag(evals) @ evecs.T
@@ -80,15 +80,15 @@ class PhonopyWrapper():
             HR = self.assure_ASR(HR, Rpts)
         return Rpts, HR
 
-    #def save_ifc(self,
-    #             fname,
-    #             kmesh,
-    #             eval_modify_function=None,
-    #             assure_ASR=False):
-    #    Rpts, HR = self.get_ifc(kmesh,
-    #                            eval_modify_function=eval_modify_function,
-    #                            assure_ASR=assure_ASR)
-    #    save_ifc_to_netcdf(fname, HR, Rpts, self.atoms)
+    def save_ifc(self,
+                 fname,
+                 kmesh,
+                 eval_modify_function=None,
+                 assure_ASR=False):
+        Rpts, HR = self.get_ifc(kmesh,
+                                eval_modify_function=eval_modify_function,
+                                assure_ASR=assure_ASR)
+        save_ifc_to_netcdf(fname, HR, Rpts, self.atoms)
 
     def solve_all(self, kpts):
         evals = []
@@ -110,13 +110,15 @@ class PhonopyWrapper():
         return ax
 
     def build_distorted_supercell2(self, supercell_matrix, modes):
-        self.phonon.set_modulations(dimension=supercell_matrix, phonon_modes=modes)
-        #cells=self.phonon.get_modulated_supercells()
+        self.phonon.set_modulations(
+            dimension=supercell_matrix, phonon_modes=modes)
+        # cells=self.phonon.get_modulated_supercells()
         modulations, supercell = self.phonon.get_modulations_and_supercell()
-        scatoms=Atoms(numbers=supercell.get_atomic_numbers(),cell=supercell.get_cell(), positions=supercell.get_positions())
-        datoms=copy.deepcopy(scatoms)
-        disp=sum(modulations)
-        datoms.set_positions(datoms.get_positions() +  disp)
+        scatoms = Atoms(numbers=supercell.get_atomic_numbers(
+        ), cell=supercell.get_cell(), positions=supercell.get_positions())
+        datoms = copy.deepcopy(scatoms)
+        disp = sum(modulations)
+        datoms.set_positions(datoms.get_positions() + disp)
         return scatoms, datoms
 
     def build_distorted_supercell(self, supercell_matrix, modes):
@@ -128,7 +130,7 @@ class PhonopyWrapper():
         sc_atoms = scmaker.sc_atoms(self.atoms)
         distorted_atoms = copy.deepcopy(sc_atoms)
         positions = distorted_atoms.get_positions()
-        d=0
+        d = 0
         for mode in modes:
             kpt, index, amp, phase, modulation_func = mode
             _, evec = self.solve(kpt)
@@ -136,19 +138,20 @@ class PhonopyWrapper():
             #print(evec[index].reshape((self.natom, 3)))
             disp = scmaker.sc_trans_kvector(
                 evec[index], kpt=kpt, phase=phase, real=True) * amp
-            p = np.exp(2j * np.pi * np.einsum('ij, j->i', self.atoms.get_scaled_positions(), kpt))
-            p = np.kron(np.ones(scmaker.ncell), np.kron([1,1,1], p))
-            #print(p.shape)
-            #print(disp.shape)
+            p = np.exp(2j * np.pi * np.einsum('ij, j->i',
+                                              self.atoms.get_scaled_positions(), kpt))
+            p = np.kron(np.ones(scmaker.ncell), np.kron([1, 1, 1], p))
+            # print(p.shape)
+            # print(disp.shape)
             disp *= p.real
-            #print(f"{disp=}")
+            # print(f"{disp=}")
             if modulation_func is None:
                 pass
             else:
                 disp *= np.array(map(modulation_func, R))
 
-            d+=disp
-        d=d.reshape((self.natom * scmaker.ncell, 3))
+            d += disp
+        d = d.reshape((self.natom * scmaker.ncell, 3))
         positions += d
         distorted_atoms.set_positions(positions)
         return sc_atoms, distorted_atoms
@@ -176,6 +179,7 @@ def save_ifc_and_show_phonon(
                             eval_modify_function=None,
                             assure_ASR=assure_ASR)
     ifc = IFC(phon.atoms, Rpts, HR)
+    ifc.save_to_netcdf("ifc_scaled.nc")
     ifc.plot_band(ax=ax, color='red', kvectors=kvectors, knames=knames)
     plt.ylabel("FC (eV/$\AA^2$) ")
     plt.show()

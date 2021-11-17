@@ -14,6 +14,7 @@ def plot_band(model,
               color='blue',
               alpha=0.8,
               marker='',
+              label=None,
               cell=np.eye(3),
               ax=None):
     if ax is None:
@@ -30,7 +31,10 @@ def plot_band(model,
     x, X, _labels = band.get_linear_kpoint_axis()
     evalues, _evecs = model.solve_all(kpts=kpts)
     for i in range(evalues.shape[1]):
-        ax.plot(x, evalues[:, i], color=color, alpha=alpha, marker=marker)
+        if i==0:
+            ax.plot(x, evalues[:, i], color=color, alpha=alpha, marker=marker, label=label)
+        else:
+            ax.plot(x, evalues[:, i], color=color, alpha=alpha, marker=marker)
 
     if efermi is not None:
         ax.axhline(efermi, linestyle='--', color='gray')
