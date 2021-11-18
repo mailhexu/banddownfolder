@@ -5,7 +5,7 @@ from phonopy import load, Phonopy
 from ase import Atoms
 from ase.dft.kpoints import monkhorst_pack
 from banddownfolder.utils.kpoints import kmesh_to_R, build_Rgrid
-from minimulti.ioput.ifc_netcdf import save_ifc_to_netcdf
+#from minimulti.ioput.ifc_netcdf import save_ifc_to_netcdf
 from banddownfolder.plot import plot_band
 from banddownfolder.wrapper.ifcwrapper import IFC
 import matplotlib.pyplot as plt
