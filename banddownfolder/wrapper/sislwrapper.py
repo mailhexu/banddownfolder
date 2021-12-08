@@ -7,10 +7,12 @@ from collections import defaultdict
 
 
 class SislWrapper():
-    def __init__(self, sisl_hamiltonian, shift_fermi=None, spin=None):
+    def __init__(self, sisl_hamiltonian, shift_fermi=None, spin=None, format='dense', nbands=10):
         self.ham = sisl_hamiltonian
         self.shift_fermi=shift_fermi
         self.spin=spin
+        self.format=format
+        self.nbands=nbands
         self.orbs=[]
         self.orb_dict=defaultdict(lambda:[])
         g=self.ham._geometry
@@ -77,10 +79,19 @@ class SislWrapper():
         print(self.orb_dict)
 
     def solve(self, k):
-        if self.spin is None:
-            evals, evecs= self.ham.eigh(k=k, eigvals_only=False)
+        if self.format == 'sparse':
+            # Calculates a subset of eigenvalues (nbands) using the sparse
+            # algorithms.
+            if self.spin is None:
+                evals, evecs= self.ham.eigsh(k=k, n=self.nbands, eigvals_only=False)
+            else:
+                evals, evecs= self.ham.eigsh(k=k, n=self.nbands, spin=self.spin, eigvals_only=False)
         else:
-            evals, evecs= self.ham.eigh(k=k, spin=self.spin, eigvals_only=False)
+            if self.spin is None:
+                evals, evecs= self.ham.eigh(k=k, eigvals_only=False)
+            else:
+                evals, evecs= self.ham.eigh(k=k, spin=self.spin, eigvals_only=False)
+
         if self.shift_fermi:
             evals += self.shift_fermi
         return evals, evecs
@@ -96,6 +107,11 @@ class SislWrapper():
         evecs = []
         for ik, k in enumerate(kpts):
             if orth and self.ham.orthogonal:
+                if self.format == 'sparse':
+                    raise NotImplementedError('Currently format="sparse" is not'
+                            ' compatible with orth="True", because there is no'
+                            ' sparse matrix square root implemented.')
+
                 S = self.ham.Sk(k, format='dense')
                 Smh = Lowdin(S)
                 H = self.Hk(k, format='dense')

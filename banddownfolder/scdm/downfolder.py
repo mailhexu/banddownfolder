@@ -277,12 +277,18 @@ class SislDownfolder(BandDownfolder):
                  fdf_file=None,
                  H=None,
                  spin=None,
-                 recover_fermi=False):
+                 recover_fermi=False,
+                 format='dense',
+                 nbands=10):
         """
         Parameters:
         ========================================
         folder: folder of siesta calculation
         fdf_file: siesta input filename
+        format: matrix format used internally, can be 'dense' or 'sparse' 
+                (default: 'dense')
+        nbands: number of eigenvalues calculated during diagonalization, only
+                relevant if format='sparse' (default:10)
         """
         try:
             import sisl
@@ -299,7 +305,8 @@ class SislDownfolder(BandDownfolder):
                 self.efermi = fdf.read_fermi_level()
             if recover_fermi:
                 self.shift_fermi = self.efermi
-        self.model = SislWrapper(H, spin=spin, shift_fermi=shift_fermi)
+        self.model = SislWrapper(H, spin=spin, shift_fermi=shift_fermi,
+                                 format=format, nbands=nbands)
         self.atoms = self.model.atoms
         try:
             positions = self.model.positions
