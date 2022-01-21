@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from banddownfolder.plot import plot_band
 from banddownfolder.wrapper.ijR import ijR
 from banddownfolder.wrapper.wannier90 import wannier_to_model
-from banddownfolder.wrapper.sislwrapper import SislWrapper
+from banddownfolder.wrapper.sislwrapper import SislHSWrapper, SislWFSXWrapper
 from banddownfolder.wrapper.phonopywrapper import PhonopyWrapper
 from banddownfolder.wrapper.myTB import MyTB
 
@@ -47,7 +47,7 @@ def make_builder(model,
     k = kmesh[0]
     kpts = monkhorst_pack(kmesh)
     nk = len(kpts)
-    kweights = [1.0/nk for k in kpts]
+    kweights = [1.0 / nk for k in kpts]
 
     evals, evecs = model.solve_all(kpts)
 
@@ -80,7 +80,8 @@ def make_builder(model,
                                            has_phase=has_phase,
                                            Rgrid=kmesh,
                                            exclude_bands=exclude_bands,
-                                           use_proj=use_proj, wfn_anchor=wfn_anchor)
+                                           use_proj=use_proj,
+                                           wfn_anchor=wfn_anchor)
         if selected_basis:
             wann_builder.set_selected_cols(selected_basis)
         elif anchors:
@@ -89,19 +90,17 @@ def make_builder(model,
             wann_builder.auto_set_anchors(anchor_kpt)
 
     elif method == "projected":
-        wann_builder = WannierProjectedBuilder(
-            evals=evals,
-            wfn=evecs,
-            has_phase=has_phase,
-            positions=positions,
-            kpts=kpts,
-            kweights=kweights,
-            nwann=nwann,
-            weight_func=weight_func,
-            Rgrid=kmesh,
-            exclude_bands=exclude_bands,
-            wfn_anchor=wfn_anchor
-        )
+        wann_builder = WannierProjectedBuilder(evals=evals,
+                                               wfn=evecs,
+                                               has_phase=has_phase,
+                                               positions=positions,
+                                               kpts=kpts,
+                                               kweights=kweights,
+                                               nwann=nwann,
+                                               weight_func=weight_func,
+                                               Rgrid=kmesh,
+                                               exclude_bands=exclude_bands,
+                                               wfn_anchor=wfn_anchor)
         if selected_basis:
             wann_builder.set_projectors_with_basis(selected_basis)
         elif anchors:
@@ -119,20 +118,21 @@ class BandDownfolder():
         self.model = model
         self.params = {}
 
-    def set_parameters(self,
-                       method='scdmk',
-                       kmesh=(5, 5, 5),
-                       nwann=0,
-                       weight_func='unity',
-                       mu=0.0,
-                       sigma=2.0,
-                       selected_basis=None,
-                       anchors=None,
-                       anchor_kpt=(0, 0, 0),
-                       use_proj=True,
-                       exclude_bands=[],
-                       post_func=None,
-                       ):
+    def set_parameters(
+        self,
+        method='scdmk',
+        kmesh=(5, 5, 5),
+        nwann=0,
+        weight_func='unity',
+        mu=0.0,
+        sigma=2.0,
+        selected_basis=None,
+        anchors=None,
+        anchor_kpt=(0, 0, 0),
+        use_proj=True,
+        exclude_bands=[],
+        post_func=None,
+    ):
         """
         Downfold the Band structure.
         The method first get the eigenvalues and eigenvectors in a Monkhorst-Pack grid from the model.
@@ -170,7 +170,8 @@ class BandDownfolder():
         with open(os.path.join(output_path, fname), 'w') as myfile:
             json.dump(results, myfile, sort_keys=True, indent=2)
 
-    def downfold(self, post_func=None,
+    def downfold(self,
+                 post_func=None,
                  output_path='./',
                  write_hr_nc='Downfolded_hr.nc',
                  write_hr_txt='Downfolded_hr.txt',
@@ -193,8 +194,8 @@ class BandDownfolder():
             self.ewf.save_txt(os.path.join(output_path, write_hr_txt))
         if write_hr_nc is not None:
             #self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
-            self.ewf.write_nc(os.path.join(
-                output_path, write_hr_nc), atoms=self.atoms)
+            self.ewf.write_nc(os.path.join(output_path, write_hr_nc),
+                              atoms=self.atoms)
         return self.ewf
 
     def plot_band_fitting(self,
@@ -229,6 +230,7 @@ class BandDownfolder():
         savefig: the filename of the figure to be saved.
         show: whether to show the band structure.
         """
+
         if True:
             ax = plot_band(self.model,
                            kvectors=kvectors,
@@ -275,39 +277,91 @@ class SislDownfolder(BandDownfolder):
     def __init__(self,
                  folder=None,
                  fdf_file=None,
+                 mode='HS',
+                 ispin=None,
                  H=None,
-                 spin=None,
-                 recover_fermi=False):
+                 recover_fermi=False,
+                 format='dense',
+                 nbands=10,
+                 wfsx_file='siesta.selected.WFSX'):
         """
         Parameters:
         ========================================
         folder: folder of siesta calculation
         fdf_file: siesta input filename
+        mode: switch between different modes of obtaining wavefunctions and 
+              eigenvalues. Supported options are:
+              - 'HS' calculate from siesta hamiltonian (default) 
+              - 'WFSX' read from siesta wavefunction file
+
+        ispin : index of spin channel to be considered. Only takes effect for
+                collinear spin calculations (UP: 0, DOWN: 1). (default: None) 
+        H : Hamiltonian object, only takes effect if 'mode' is set to 'HS' 
+            (default: None)
+        format: matrix format used internally, can be 'dense' or 'sparse',
+                only takes effect if 'mode' is 'WFSX' (default: 'dense') 
+        nbands: number of eigenvalues calculated during diagonalization, only 
+                relevant if format='sparse', only takes effec if 'mode' is 
+                'WFSX' (default:10) 
+        wfsx_file: name of WFSX file to read, only takes effect if 'mode' 
+                   is set to 'WFSX' (default: 'siesta.selected.WFSX')
         """
         try:
             import sisl
         except ImportError:
             raise ImportError("sisl is needed. Do you have sisl installed?")
-        shift_fermi = None
-        if H is None:
+
+        self.shift_fermi = None
+
+        if mode == 'HS':
+            if H is None:
+                fdf = sisl.get_sile(os.path.join(folder, fdf_file))
+                fdf.read()
+                H = fdf.read_hamiltonian()
+                try:
+                    self.efermi = fdf.read_fermi_level().data[0]
+                except:
+                    self.efermi = fdf.read_fermi_level()
+                if recover_fermi:
+                    self.shift_fermi = self.efermi
+                self.model = SislHSWrapper(H,
+                                           shift_fermi=self.shift_fermi,
+                                           ispin=ispin,
+                                           format=format,
+                                           nbands=nbands)
+        elif mode == 'WFSX':
+            wfsx_sile = sisl.get_sile(os.path.join(folder, wfsx_file))
             fdf = sisl.get_sile(os.path.join(folder, fdf_file))
-            fdf.read()
-            H = fdf.read_hamiltonian()
+            geom = fdf.read_geometry()
+            spin = sisl.Spin(fdf.get('Spin'))
             try:
                 self.efermi = fdf.read_fermi_level().data[0]
             except:
                 self.efermi = fdf.read_fermi_level()
-            if recover_fermi:
-                self.shift_fermi = self.efermi
-        self.model = SislWrapper(H, spin=spin, shift_fermi=shift_fermi)
+
+            # Eigen values in WFSX sile are not shifted by default
+            # therefore we invert the behavior of recover_fermi/shift_fermi
+            if not recover_fermi:
+                self.shift_fermi = -self.efermi
+            self.model = SislWFSXWrapper(geom,
+                                         wfsx_sile=wfsx_sile,
+                                         spin=spin,
+                                         ispin=ispin,
+                                         shift_fermi=self.shift_fermi)
+        else:
+            raise ValueError(
+                f"{self.__class__.__name__} does not support mode "
+                f"{mode}. Supported options are: 'HS', 'WFSX'.")
+
         self.atoms = self.model.atoms
         try:
             positions = self.model.positions
         except Exception:
             positions = None
-        self.model_info = {'orb_names': tuple(self.model.orbs),
-                           'positions': positions.tolist()
-                           }
+        self.model_info = {
+            'orb_names': tuple(self.model.orbs),
+            'positions': positions.tolist()
+        }
         self.params = {}
 
     def save_info(self, output_path='./', fname='Downfold.json'):
