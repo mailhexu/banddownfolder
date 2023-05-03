@@ -7,9 +7,9 @@ from scipy.linalg import qr, svd, norm, eigh
 from scipy.special import erfc
 from netCDF4 import Dataset
 from ase.dft.kpoints import get_monkhorst_pack_size_and_offset
-from banddownfolder.utils.kpoints import kmesh_to_R, build_Rgrid
-from banddownfolder.scdm.lwf import LWF
-from banddownfolder.scdm.scdmk import WannierBuilder, scdm, occupation_func
+from wannierbuilder.utils.kpoints import kmesh_to_R, build_Rgrid
+from wannierbuilder.scdm.lwf import LWF
+from wannierbuilder.scdm.scdmk import WannierBuilder, scdm, occupation_func
 from ase.dft.kpoints import monkhorst_pack
 from minimulti.electron.density import density_matrix
 import os
@@ -73,7 +73,7 @@ class SpinDensityMatricesDownfolder(WannierBuilder):
                      mu=None,
                      sigma=None,
                      nwann=None):
-        from banddownfolder.wrapper.myTB import MyTB
+        from wannierbuilder.wrapper.myTB import MyTB
         k = kmesh[0]
         kpts = monkhorst_pack(kmesh)
 
@@ -203,7 +203,7 @@ class SpinDensityMatricesDownfolder(WannierBuilder):
         self.lwf_down.save_txt(txt_fname)
         self.lwf_down.write_nc(nc_fname, atoms=self.atoms)
 
-        from banddownfolder.plot import plot_band
+        from wannierbuilder.plot import plot_band
         ax = plot_band(self.lwf_up)
 
         ax = plot_band(self.lwf_down, color='red')

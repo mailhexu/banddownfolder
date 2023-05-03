@@ -5,15 +5,15 @@ import copy
 import json
 from ase.dft.kpoints import monkhorst_pack
 import numpy as np
-from banddownfolder.scdm.scdmk import (WannierProjectedBuilder,
+from wannierbuilder.scdm.scdmk import (WannierProjectedBuilder,
                                        WannierScdmkBuilder, occupation_func)
 import matplotlib.pyplot as plt
-from banddownfolder.plot import plot_band
-from banddownfolder.wrapper.ijR import ijR
-from banddownfolder.wrapper.wannier90 import wannier_to_model
-from banddownfolder.wrapper.sislwrapper import SislWrapper
-from banddownfolder.wrapper.phonopywrapper import PhonopyWrapper
-from banddownfolder.wrapper.myTB import MyTB
+from wannierbuilder.plot import plot_band
+from wannierbuilder.wrapper.ijR import ijR
+from wannierbuilder.wrapper.wannier90 import wannier_to_model
+from wannierbuilder.wrapper.sislwrapper import SislWrapper
+from wannierbuilder.wrapper.phonopywrapper import PhonopyWrapper
+from wannierbuilder.wrapper.myTB import MyTB
 
 
 @dataclass
@@ -212,7 +212,7 @@ class BandDownfolder():
                           ax=None,
                           savefig='Downfolded_band.png',
                           cell=np.eye(3),
-                          show=True):
+                          show=True, **kargs):
         """
         Parameters:
         ========================================
@@ -241,7 +241,7 @@ class BandDownfolder():
                            erange=erange,
                            efermi=efermi,
                            cell=cell,
-                           ax=ax)
+                           ax=ax, **kargs)
         ax = plot_band(self.ewf,
                        kvectors=kvectors,
                        knames=knames,
@@ -253,7 +253,7 @@ class BandDownfolder():
                        marker=marker,
                        erange=erange,
                        cell=cell,
-                       ax=ax)
+                       ax=ax, **kargs)
         if savefig is not None:
             plt.savefig(savefig)
         if show:

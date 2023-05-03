@@ -2,7 +2,7 @@
 import os
 import json
 import numpy as np
-from banddownfolder.scdm.lwf import LWF
+from wannierbuilder.scdm.lwf import LWF
 from minimulti.electron.basis2 import BasisSet, Basis
 from minimulti.utils.symbol import symbol_number
 from minimulti.electron.ijR import ijR

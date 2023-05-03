@@ -3,7 +3,7 @@ from ase.io import read
 import os
 from collections import OrderedDict
 #import banddownfolder.wrapper.pythtb as pythtb
-from banddownfolder.utils.symbol import symbol_number
+from wannierbuilder.utils.symbol import symbol_number
 
 
 def _red_to_cart(tmp, red):

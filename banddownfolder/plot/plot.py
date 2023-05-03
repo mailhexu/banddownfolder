@@ -16,6 +16,9 @@ def plot_band(model,
               marker='',
               label=None,
               cell=np.eye(3),
+              evals_to_freq=False,
+              unit_factor=1,
+              ylabel='Energy (eV)',
               ax=None):
     if ax is None:
         _fig, ax = plt.subplots()
@@ -24,15 +27,23 @@ def plot_band(model,
         supercell_matrix = np.eye(3)
     kvectors = [np.dot(k, supercell_matrix) for k in kvectors]
     if 'cell' not in model.__dict__:
-        band = bandpath(kvectors, cell@supercell_matrix, npoints)
+        band = bandpath(kvectors, cell @ supercell_matrix, npoints)
     else:
-        band = bandpath(kvectors, cell@supercell_matrix, npoints)
+        band = bandpath(kvectors, cell @ supercell_matrix, npoints)
     kpts = band.kpts
     x, X, _labels = band.get_linear_kpoint_axis()
     evalues, _evecs = model.solve_all(kpts=kpts)
+    if evals_to_freq:
+        evalues = np.where(evalues < 0, -np.sqrt(-evalues), np.sqrt(evalues))
+    evalues *= unit_factor
     for i in range(evalues.shape[1]):
-        if i==0:
-            ax.plot(x, evalues[:, i], color=color, alpha=alpha, marker=marker, label=label)
+        if i == 0:
+            ax.plot(x,
+                    evalues[:, i],
+                    color=color,
+                    alpha=alpha,
+                    marker=marker,
+                    label=label)
         else:
             ax.plot(x, evalues[:, i], color=color, alpha=alpha, marker=marker)
 
@@ -43,7 +54,7 @@ def plot_band(model,
             plt.axhline(model.get_fermi_level(), linestyle='--', color='gray')
         except AttributeError:
             pass
-    ax.set_ylabel('Energy (eV)')
+    ax.set_ylabel(ylabel)
     ax.set_xlim(x[0], x[-1])
     ax.set_xticks(X)
     ax.set_xticklabels(knames)

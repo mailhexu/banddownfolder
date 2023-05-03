@@ -1,30 +1,31 @@
 import numpy as np
 from scipy.linalg import eigh
-from banddownfolder.math.linalg import Lowdin
+from wannierbuilder.math.linalg import Lowdin
 from ase.atoms import Atoms
-from banddownfolder.utils.symbol import symbol_number
+from wannierbuilder.utils.symbol import symbol_number
 from collections import defaultdict
 
 
 class SislWrapper():
     def __init__(self, sisl_hamiltonian, shift_fermi=None, spin=None, format='dense', nbands=10):
         self.ham = sisl_hamiltonian
-        self.shift_fermi=shift_fermi
-        self.spin=spin
-        self.format=format
-        self.nbands=nbands
-        self.orbs=[]
-        self.orb_dict=defaultdict(lambda:[])
-        g=self.ham._geometry
-        _atoms=self.ham._geometry._atoms
-        atomic_numbers=[]
-        atom_positions=g.xyz
-        self.cell=np.array(g.sc.cell)
+        self.shift_fermi = shift_fermi
+        self.spin = spin
+        self.format = format
+        self.nbands = nbands
+        self.orbs = []
+        self.orb_dict = defaultdict(lambda: [])
+        g = self.ham._geometry
+        _atoms = self.ham._geometry._atoms
+        atomic_numbers = []
+        atom_positions = g.xyz
+        self.cell = np.array(g.sc.cell)
         for ia, a in enumerate(_atoms):
             atomic_numbers.append(a.Z)
-        self.atoms=Atoms(numbers=atomic_numbers, cell=self.cell, positions=atom_positions)
-        xred=self.atoms.get_scaled_positions()
-        sdict=list(symbol_number(self.atoms).keys())
+        self.atoms = Atoms(numbers=atomic_numbers,
+                           cell=self.cell, positions=atom_positions)
+        xred = self.atoms.get_scaled_positions()
+        sdict = list(symbol_number(self.atoms).keys())
         if self.ham.spin.is_colinear:
             if spin is None:
                 raise ValueError("For colinear spin, spin must be given")
@@ -34,46 +35,45 @@ class SislWrapper():
                     "For non-colinear spin and unpolarized spin, spin should be None"
                 )
 
-        self.positions=[]
+        self.positions = []
         if self.ham.spin.is_colinear:
             for ia, a in enumerate(_atoms):
-                symnum=sdict[ia]
-                orb_names=[]
+                symnum = sdict[ia]
+                orb_names = []
                 for x in a.orbitals:
-                    name=f"{symnum}|{x.name()}|{spin}"
+                    name = f"{symnum}|{x.name()}|{spin}"
                     orb_names.append(name)
                     self.positions.append(xred[ia])
-                self.orbs+=orb_names
-                self.orb_dict[ia]+=orb_names
+                self.orbs += orb_names
+                self.orb_dict[ia] += orb_names
             self.norb = len(self.orbs)
-            self.nbasis=self.norb
+            self.nbasis = self.norb
         elif self.ham.spin.is_spinorbit:
             for spin in ['up', 'down']:
                 for ia, a in enumerate(_atoms):
-                    symnum=sdict[ia]
-                    orb_names=[]
+                    symnum = sdict[ia]
+                    orb_names = []
                     for x in a.orbitals:
-                        name=f"{symnum}|{x.name()}|{spin}"
+                        name = f"{symnum}|{x.name()}|{spin}"
                         orb_names.append(name)
                         self.positions.append(xred[ia])
-                    self.orbs+=orb_names
-                    self.orb_dict[ia]+=orb_names
-            self.norb=len(self.orbs)/2
-            self.nbasis= len(self.orbs)
+                    self.orbs += orb_names
+                    self.orb_dict[ia] += orb_names
+            self.norb = len(self.orbs)/2
+            self.nbasis = len(self.orbs)
         else:
             for ia, a in enumerate(_atoms):
-                symnum=sdict[ia]
-                orb_names=[]
+                symnum = sdict[ia]
+                orb_names = []
                 for x in a.orbitals:
-                    name=f"{symnum}|{x.name()}|None"
+                    name = f"{symnum}|{x.name()}|None"
                     orb_names.append(name)
                     self.positions.append(xred[ia])
-                self.orbs+=orb_names
-                self.orb_dict[ia]+=orb_names
-            self.norb=len(self.orbs)
-            self.nbasis= len(self.orbs)
-        self.positions=np.array(self.positions, dtype=float)
-
+                self.orbs += orb_names
+                self.orb_dict[ia] += orb_names
+            self.norb = len(self.orbs)
+            self.nbasis = len(self.orbs)
+        self.positions = np.array(self.positions, dtype=float)
 
     def print_orbs(self):
         print(self.orb_dict)
@@ -83,14 +83,17 @@ class SislWrapper():
             # Calculates a subset of eigenvalues (nbands) using the sparse
             # algorithms.
             if self.spin is None:
-                evals, evecs= self.ham.eigsh(k=k, n=self.nbands, eigvals_only=False)
+                evals, evecs = self.ham.eigsh(
+                    k=k, n=self.nbands, eigvals_only=False, which='SA', mode='normal', sigma=10)
             else:
-                evals, evecs= self.ham.eigsh(k=k, n=self.nbands, spin=self.spin, eigvals_only=False)
+                evals, evecs = self.ham.eigsh(
+                    k=k, n=self.nbands, spin=self.spin, eigvals_only=False,  which='SA', mode='normal', sigma=1)
         else:
             if self.spin is None:
-                evals, evecs= self.ham.eigh(k=k, eigvals_only=False)
+                evals, evecs = self.ham.eigh(k=k, eigvals_only=False)
             else:
-                evals, evecs= self.ham.eigh(k=k, spin=self.spin, eigvals_only=False)
+                evals, evecs = self.ham.eigh(
+                    k=k, spin=self.spin, eigvals_only=False)
 
         if self.shift_fermi:
             evals += self.shift_fermi
@@ -109,8 +112,8 @@ class SislWrapper():
             if orth and self.ham.orthogonal:
                 if self.format == 'sparse':
                     raise NotImplementedError('Currently format="sparse" is not'
-                            ' compatible with orth="True", because there is no'
-                            ' sparse matrix square root implemented.')
+                                              ' compatible with orth="True", because there is no'
+                                              ' sparse matrix square root implemented.')
 
                 S = self.ham.Sk(k, format='dense')
                 Smh = Lowdin(S)
@@ -130,5 +133,3 @@ class SislWrapper():
             return self.shift_fermi
         else:
             return 0.0
-
-

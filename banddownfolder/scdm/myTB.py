@@ -209,7 +209,7 @@ class MyTB(AbstractTB):
                             posfile='POSCAR',
                             nls=True,
                             groupby='spin'):
-        from banddownfolder.scdm.lwf import LWF
+        from wannierbuilder.scdm.lwf import LWF
         lwf = LWF.load_nc(fname=os.path.join(path, f"{prefix}.nc"))
         nbasis = lwf.nwann
         nspin = 1

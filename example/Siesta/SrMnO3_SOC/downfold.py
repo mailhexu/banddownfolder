@@ -3,7 +3,8 @@ import numpy as np
 
 
 def main():
-    downfolder = SislDownfolder(folder='.', fdf_file='siesta.fdf')
+    downfolder = SislDownfolder(
+        folder='.', fdf_file='siesta.fdf', format="sparse", nbands=50)
     downfolder.downfold(
         method='scdmk',
         kmesh=[5, 5, 5],
@@ -34,5 +35,6 @@ def main():
         savefig='Downfolded_band.png',
         show=True)
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     main()

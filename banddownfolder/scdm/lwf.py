@@ -2,11 +2,51 @@ import numpy as np
 import copy
 from scipy.linalg import eigh
 from netCDF4 import Dataset
-from ase.dft.kpoints import monkhorst_pack
 from ase import Atoms
-from banddownfolder.scdm.eigen_modifer import HamModifier, force_ASR_kspace
+from wannierbuilder.scdm.eigen_modifer import HamModifier, force_ASR_kspace
 import matplotlib.pyplot as plt
-from banddownfolder.plot import plot_band
+from wannierbuilder.plot import plot_band
+from dataclasses import dataclass
+
+
+@dataclass
+class twobody_terms:
+    #nterm: int = 0
+    #Rlist: np.ndarray = None
+    #coeff_twobody: np.array
+
+    def __init__(self):
+        self.nterm: int = 0
+        self.Rlist = None
+        coeff_twobody = None
+
+    def write_to_netcdf_file(self, ncfile: Dataset):
+        Dataset.redef()
+        nterm = Dataset.createDimension("nterm", self.nterm)
+        iR = Dataset.createVariable("wann_twobody_iR",
+                                    int,
+                                    dimensions=("nterm", ))
+        i = Dataset.createVariable("wann_twobody_i",
+                                   int,
+                                   dimensions=("nterm", ))
+        j = Dataset.createVariable("wann_twobody_j",
+                                   int,
+                                   dimensions=("nterm", ))
+        orderi = Dataset.createVariable("wann_twobody_orderi",
+                                        int,
+                                        dimensions=("nterm", ))
+        orderj = Dataset.createVariable("wann_twobody_orderj",
+                                        int,
+                                        dimensions=("nterm", ))
+        val = Dataset.createVariable("wann_twobody_val",
+                                     int,
+                                     dimensions=("nterm", ))
+        iR[:] = self.iR
+        i[:] = self.coeff_twobody[0, :]
+        j[:] = self.coeff_twobody[1, :]
+        orderi[:] = self.coeff_twobody[2, :]
+        orderj[:] = self.coeff_twobody[3, :]
+        val[:] = self.val
 
 
 class LWF():
@@ -14,7 +54,15 @@ class LWF():
     Localized Wannier function
     """
 
-    def __init__(self, wannR, HwannR, Rlist, cell, wann_centers, atoms=None):
+    def __init__(self,
+                 wannR,
+                 HwannR,
+                 Rlist,
+                 cell,
+                 wann_centers,
+                 atoms=None,
+                 fortran_order=False,
+                 twobody_terms=None):
         self.atoms = atoms
         self.wannR = wannR
         self.HwannR = HwannR
@@ -26,6 +74,7 @@ class LWF():
         self.Rdict = {}
         for i, R in enumerate(Rlist):
             self.Rdict[tuple(R)] = i
+        self.twobody_terms = twobody_terms
 
     def find_iR_at_zero(self):
         iR = np.argmin(np.linalg.norm(self.Rlist, axis=1))
@@ -128,8 +177,8 @@ class LWF():
                                          zlib=True)
         wann_center_xred = root.createVariable(prefix + 'wannier_center_xred',
                                                float,
-                                               dimensions=(
-                                                   prefix + 'nwann', 'three'),
+                                               dimensions=(prefix + 'nwann',
+                                                           'three'),
                                                zlib=True)
 
         if atoms is not None:
@@ -173,11 +222,16 @@ class LWF():
         wannR_real[:] = np.real(self.wannR)
         wannR_imag[:] = np.imag(self.wannR)
         wann_center_xred[:] = np.array(self.wann_centers)
+
+        if twobody_terms is not None:
+            twobody_terms.write_to_netcdf_file(root)
+
         root.close()
 
     def masses_to_lwf_masses(self, masses):
         m3 = np.kron(masses, [1, 1, 1])
-        return np.einsum('rij,i->j', (self.wannR.conj()*self.wannR), m3)
+        # print(self.wannR.conj()*self.wannR)
+        return np.einsum('rij,i->j', (self.wannR.conj() * self.wannR), m3)
 
     def write_lwf_nc(self, fname, prefix='wann_', atoms=None):
         root = Dataset(fname, 'w')
@@ -266,10 +320,11 @@ class LWF():
         wannR_real[:] = np.real(self.wannR)
         wannR_imag[:] = np.imag(self.wannR)
         wann_centers[:, :] = self.wann_centers
+
         root.close()
 
     @staticmethod
-    def load_nc(fname, prefix='wann_'):
+    def load_nc(fname, prefix='wann_', order='C'):
         root = Dataset(fname, 'r')
         ndim = root.dimensions['ndim'].size
         nR = root.dimensions['nR'].size
@@ -296,6 +351,10 @@ class LWF():
         wannR_real = root.variables[prefix + 'wannier_function_real'][:]
         wannR_imag = root.variables[prefix + 'wannier_function_imag'][:]
         wannR = wannR_real + wannR_imag * 1.0j
+        if order.strip().capitalize().startswith("F"):
+            wannR = np.swapaxes(wannR, 1, 2)
+            Ham = np.swapaxes(Ham, 1, 2)
+
         # FIXME: cell and wann_centers
         if has_atom:
             numbers = root.variables[prefix + 'atomic_numbers'][:]
@@ -307,10 +366,11 @@ class LWF():
             atoms = None
 
         try:
-            wann_centers = root.variables[prefix+'wannier_center_xred'][:]
+            wann_centers = root.variables[prefix + 'wannier_center_xred'][:]
         except:
             print(
-                f"Warning: wannier centers {prefix+'wannier_center_xred'} not found, using 0 instead.")
+                f"Warning: wannier centers {prefix+'wannier_center_xred'} not found, using 0 instead."
+            )
             wann_centers = np.zeros((nwann, ndim))
         return LWF(wannR,
                    Ham,
@@ -366,6 +426,7 @@ class LWF():
 
 
 class LWF_COHP(LWF):
+
     def solve_all(self, k_list, eig_vectors=True, total_ham=True):
         nk = len(k_list)
         evals, evecs, hams = np.zeros((self.nwann, nk)), np.zeros(
@@ -405,16 +466,39 @@ class LWF_COHP(LWF):
 def test_modify_evals():
     fname = "/home/hexu/projects/LAO/scripts/Downfolded_hr.nc"
     wf = LWF.load_nc(fname)
-    ax = plot_band(wf,
-                   color='black')
-    new_wf = wf.modify_evals(func=lambda x: x+1.0, kmesh=[5, 5, 5])
+    ax = plot_band(wf, color='black')
+    new_wf = wf.modify_evals(func=lambda x: x + 1.0, kmesh=[5, 5, 5])
 
     new_wf.write_lwf_nc("shifted_lwf.nc")
-    ax = plot_band(new_wf,
-                   color='blue',
-                   ax=ax)
-
+    ax = plot_band(new_wf, color='blue', ax=ax)
     plt.show()
+
+
+def merge_two_LWF(wf1, wf2):
+    nwann1 = wf1.nwann
+    nwann2 = wf2.nwann
+    nwann = nwann1 + nwann2
+    nbasis = wf1.nbasis
+    nR = wf1.nR
+    wannR = np.zeros((nR, nbasis, nwann), dtype=complex)
+    HwannR = np.zeros((nR, nwann, nwann), dtype=complex)
+    wannR[:, :, :nwann1] = wf1.wannR
+    wannR[:, :, nwann1:] = wf2.wannR
+    HwannR[:, :nwann1, :nwann1] = wf1.HwannR
+    HwannR[:, nwann1:, nwann1:] = wf2.HwannR
+    Rlist = wf1.Rlist
+    cell = wf1.cell
+    wann_centers = np.vstack([wf1.wann_centers, wf2.wann_centers])
+    lwf = LWF(wannR,
+              HwannR,
+              Rlist,
+              cell,
+              wann_centers,
+              atoms=wf1.atoms,
+              fortran_order=False,
+              twobody_terms=None)
+    # TODO: add onebody terms and twobody_terms
+    return lwf
 
 
 if __name__ == "__main__":
