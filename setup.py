@@ -2,7 +2,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='banddownfolder',
+    name='wannierbuilder',
     version='0.1.5',
     description='Downfold Hamiltonian',
     author='Xu He',
